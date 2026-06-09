@@ -73,6 +73,8 @@ export interface ProjectMeta {
   frameworks: string[];
   description: string;
   gitCommitHash: string;
+  /** build/config files (pom.xml, build.gradle, …) — evidence source for language/framework claims (§5.2 path-only OK). */
+  configFiles: string[];
 }
 
 export interface Layer {

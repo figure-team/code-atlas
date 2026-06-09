@@ -62,6 +62,7 @@ interface RawProject {
   frameworks?: string[];
   description?: string;
   gitCommitHash?: string;
+  configFiles?: string[];
 }
 
 interface RawLayer {
@@ -314,6 +315,7 @@ export function parseRawGraph(raw: RawGraph, options: ReadOptions = {}): Canonic
     frameworks: raw.project?.frameworks ?? [],
     description: raw.project?.description ?? "",
     gitCommitHash: raw.project?.gitCommitHash ?? "",
+    configFiles: raw.project?.configFiles ?? [],
   };
 
   // Map each layer's raw nodeIds → uids (drop ids that resolved to nothing).

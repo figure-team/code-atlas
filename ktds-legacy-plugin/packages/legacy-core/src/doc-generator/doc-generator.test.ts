@@ -22,7 +22,7 @@ function node(uid: string, kind: string, extra: Partial<CanonicalNode> = {}): Ca
 function graphOf(nodes: CanonicalNode[], edges: CanonicalEdge[] = [], extra: Partial<CanonicalGraph> = {}): CanonicalGraph {
   return {
     sourceVersion: "1.0.0", fingerprint: "x",
-    project: { name: "p", languages: [], frameworks: [], description: "", gitCommitHash: "" },
+    project: { name: "p", languages: [], frameworks: [], description: "", gitCommitHash: "", configFiles: [] },
     layers: [], nodes, edges, ...extra,
   };
 }
@@ -71,7 +71,7 @@ describe("builders (unit)", () => {
   it("CONFIRMED_AI when the node has evidence, INFERRED when not", () => {
     const g = graphOf([
       node("Svc#m", "module", { evidence: { path: "src/Svc.ts", line: 3 } }),
-    ], [], { project: { name: "p", languages: ["java"], frameworks: ["spring"], description: "", gitCommitHash: "" } });
+    ], [], { project: { name: "p", languages: ["java"], frameworks: ["spring"], description: "", gitCommitHash: "", configFiles: [] } });
     const doc = buildTechStack(g);
     const modClaim = doc.sections.find((s) => s.heading === "모듈")!.claims[0]!;
     expect(modClaim.confidence).toBe("CONFIRMED_AI");
@@ -79,6 +79,13 @@ describe("builders (unit)", () => {
     // language is project-derived → INFERRED (no file evidence)
     const langClaim = doc.sections.find((s) => s.heading === "언어")!.claims[0]!;
     expect(langClaim.confidence).toBe("INFERRED");
+  });
+
+  it("language/framework cite the build file as evidence when configFiles present (§5.2)", () => {
+    const g = graphOf([], [], { project: { name: "p", languages: ["java"], frameworks: ["Spring"], description: "", gitCommitHash: "", configFiles: ["pom.xml"] } });
+    const lang = buildTechStack(g).sections.find((s) => s.heading === "언어")!.claims[0]!;
+    expect(lang.confidence).toBe("CONFIRMED_AI");
+    expect(lang.evidence[0]).toEqual({ path: "pom.xml" });
   });
 
   it("api/db builders pick endpoint and table nodes", () => {

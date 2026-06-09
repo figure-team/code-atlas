@@ -1,0 +1,1483 @@
+{
+ "version": "1.0.0",
+ "project": {
+  "name": "jpetstore-6",
+  "languages": [
+   "java",
+   "xml",
+   "sql"
+  ],
+  "frameworks": [
+   "Spring",
+   "MyBatis",
+   "Stripes"
+  ],
+  "description": "MyBatis JPetStore — Spring DI + MyBatis + Stripes 레퍼런스 웹앱",
+  "analyzedAt": "2026-06-09T00:00:00.000Z",
+  "gitCommitHash": "jpetstore-6-main",
+  "configFiles": [
+   "pom.xml"
+  ]
+ },
+ "layers": [
+  {
+   "id": "layer:web",
+   "name": "Web (Stripes ActionBeans)",
+   "description": "HTTP 요청 처리",
+   "nodeIds": [
+    "bean:AccountActionBean",
+    "bean:CatalogActionBean",
+    "bean:CartActionBean",
+    "bean:OrderActionBean",
+    "ep:AccountActionBean.newAccount",
+    "ep:AccountActionBean.signon",
+    "ep:AccountActionBean.signoff",
+    "ep:AccountActionBean.editAccount",
+    "ep:CatalogActionBean.viewCategory",
+    "ep:CatalogActionBean.viewProduct",
+    "ep:CatalogActionBean.viewItem",
+    "ep:CatalogActionBean.searchProducts",
+    "ep:CartActionBean.addItemToCart",
+    "ep:CartActionBean.removeItemFromCart",
+    "ep:CartActionBean.updateCartQuantities",
+    "ep:CartActionBean.checkOut",
+    "ep:OrderActionBean.listOrders",
+    "ep:OrderActionBean.newOrder",
+    "ep:OrderActionBean.viewOrder"
+   ]
+  },
+  {
+   "id": "layer:service",
+   "name": "Service",
+   "description": "업무 로직",
+   "nodeIds": [
+    "svc:AccountService",
+    "svc:CatalogService",
+    "svc:OrderService"
+   ]
+  },
+  {
+   "id": "layer:persistence",
+   "name": "Persistence (MyBatis Mappers)",
+   "description": "데이터 접근",
+   "nodeIds": [
+    "map:AccountMapper",
+    "map:CategoryMapper",
+    "map:ItemMapper",
+    "map:LineItemMapper",
+    "map:OrderMapper",
+    "map:ProductMapper",
+    "map:SequenceMapper"
+   ]
+  },
+  {
+   "id": "layer:domain",
+   "name": "Domain",
+   "description": "도메인 모델",
+   "nodeIds": [
+    "cls:Account",
+    "cls:Cart",
+    "cls:CartItem",
+    "cls:Category",
+    "cls:Item",
+    "cls:LineItem",
+    "cls:Order",
+    "cls:Product",
+    "cls:Sequence"
+   ]
+  },
+  {
+   "id": "layer:database",
+   "name": "Database",
+   "description": "관계형 스키마",
+   "nodeIds": [
+    "tbl:SUPPLIER",
+    "tbl:SIGNON",
+    "tbl:ACCOUNT",
+    "tbl:PROFILE",
+    "tbl:BANNERDATA",
+    "tbl:ORDERS",
+    "tbl:ORDERSTATUS",
+    "tbl:LINEITEM",
+    "tbl:CATEGORY",
+    "tbl:PRODUCT",
+    "tbl:ITEM",
+    "tbl:INVENTORY",
+    "tbl:SEQUENCE"
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "id": "dom:account",
+   "type": "domain",
+   "name": "계정/인증",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions",
+   "lineRange": [
+    1,
+    2
+   ],
+   "summary": "회원 가입·로그인·계정 관리",
+   "tags": [
+    "domain"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "dom:catalog",
+   "type": "domain",
+   "name": "카탈로그",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions",
+   "lineRange": [
+    1,
+    2
+   ],
+   "summary": "카테고리·상품·아이템 조회 및 검색",
+   "tags": [
+    "domain"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "dom:cart",
+   "type": "domain",
+   "name": "장바구니",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions",
+   "lineRange": [
+    1,
+    2
+   ],
+   "summary": "장바구니 담기·수정·조회",
+   "tags": [
+    "domain"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "dom:order",
+   "type": "domain",
+   "name": "주문",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions",
+   "lineRange": [
+    1,
+    2
+   ],
+   "summary": "주문 생성·조회·결제 흐름",
+   "tags": [
+    "domain"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Account",
+   "type": "class",
+   "name": "Account",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Account.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "Account 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Cart",
+   "type": "class",
+   "name": "Cart",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Cart.java",
+   "lineRange": [
+    32,
+    33
+   ],
+   "summary": "Cart 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:CartItem",
+   "type": "class",
+   "name": "CartItem",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/CartItem.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "CartItem 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Category",
+   "type": "class",
+   "name": "Category",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Category.java",
+   "lineRange": [
+    25,
+    26
+   ],
+   "summary": "Category 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Item",
+   "type": "class",
+   "name": "Item",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Item.java",
+   "lineRange": [
+    26,
+    27
+   ],
+   "summary": "Item 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:LineItem",
+   "type": "class",
+   "name": "LineItem",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/LineItem.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "LineItem 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Order",
+   "type": "class",
+   "name": "Order",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Order.java",
+   "lineRange": [
+    30,
+    31
+   ],
+   "summary": "Order 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Product",
+   "type": "class",
+   "name": "Product",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Product.java",
+   "lineRange": [
+    25,
+    26
+   ],
+   "summary": "Product 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "cls:Sequence",
+   "type": "class",
+   "name": "Sequence",
+   "filePath": "src/main/java/org/mybatis/jpetstore/domain/Sequence.java",
+   "lineRange": [
+    25,
+    26
+   ],
+   "summary": "Sequence 도메인 엔티티",
+   "tags": [
+    "domain-model"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "svc:AccountService",
+   "type": "class",
+   "name": "AccountService",
+   "filePath": "src/main/java/org/mybatis/jpetstore/service/AccountService.java",
+   "lineRange": [
+    31,
+    32
+   ],
+   "summary": "AccountService 업무 로직",
+   "tags": [
+    "service"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "svc:CatalogService",
+   "type": "class",
+   "name": "CatalogService",
+   "filePath": "src/main/java/org/mybatis/jpetstore/service/CatalogService.java",
+   "lineRange": [
+    35,
+    36
+   ],
+   "summary": "CatalogService 업무 로직",
+   "tags": [
+    "service"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "svc:OrderService",
+   "type": "class",
+   "name": "OrderService",
+   "filePath": "src/main/java/org/mybatis/jpetstore/service/OrderService.java",
+   "lineRange": [
+    38,
+    39
+   ],
+   "summary": "OrderService 업무 로직",
+   "tags": [
+    "service"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:AccountMapper",
+   "type": "class",
+   "name": "AccountMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/AccountMapper.java",
+   "lineRange": [
+    25,
+    26
+   ],
+   "summary": "AccountMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:CategoryMapper",
+   "type": "class",
+   "name": "CategoryMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/CategoryMapper.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "CategoryMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:ItemMapper",
+   "type": "class",
+   "name": "ItemMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/ItemMapper.java",
+   "lineRange": [
+    28,
+    29
+   ],
+   "summary": "ItemMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:LineItemMapper",
+   "type": "class",
+   "name": "LineItemMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/LineItemMapper.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "LineItemMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:OrderMapper",
+   "type": "class",
+   "name": "OrderMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/OrderMapper.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "OrderMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:ProductMapper",
+   "type": "class",
+   "name": "ProductMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/ProductMapper.java",
+   "lineRange": [
+    27,
+    28
+   ],
+   "summary": "ProductMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "map:SequenceMapper",
+   "type": "class",
+   "name": "SequenceMapper",
+   "filePath": "src/main/java/org/mybatis/jpetstore/mapper/SequenceMapper.java",
+   "lineRange": [
+    25,
+    26
+   ],
+   "summary": "SequenceMapper MyBatis 매퍼",
+   "tags": [
+    "mybatis",
+    "persistence"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "bean:AccountActionBean",
+   "type": "class",
+   "name": "AccountActionBean",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+   "lineRange": [
+    43,
+    44
+   ],
+   "summary": "AccountActionBean 웹 액션 (Stripes)",
+   "tags": [
+    "web",
+    "stripes"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "bean:CatalogActionBean",
+   "type": "class",
+   "name": "CatalogActionBean",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+   "lineRange": [
+    36,
+    37
+   ],
+   "summary": "CatalogActionBean 웹 액션 (Stripes)",
+   "tags": [
+    "web",
+    "stripes"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "bean:CartActionBean",
+   "type": "class",
+   "name": "CartActionBean",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+   "lineRange": [
+    38,
+    39
+   ],
+   "summary": "CartActionBean 웹 액션 (Stripes)",
+   "tags": [
+    "web",
+    "stripes"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "bean:OrderActionBean",
+   "type": "class",
+   "name": "OrderActionBean",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java",
+   "lineRange": [
+    38,
+    39
+   ],
+   "summary": "OrderActionBean 웹 액션 (Stripes)",
+   "tags": [
+    "web",
+    "stripes"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:AccountActionBean.newAccount",
+   "type": "endpoint",
+   "name": "newAccount",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+   "lineRange": [
+    115,
+    116
+   ],
+   "summary": "newAccount 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:AccountActionBean.signon",
+   "type": "endpoint",
+   "name": "signon",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+   "lineRange": [
+    159,
+    160
+   ],
+   "summary": "signon 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:AccountActionBean.signoff",
+   "type": "endpoint",
+   "name": "signoff",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+   "lineRange": [
+    184,
+    185
+   ],
+   "summary": "signoff 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:AccountActionBean.editAccount",
+   "type": "endpoint",
+   "name": "editAccount",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+   "lineRange": [
+    137,
+    138
+   ],
+   "summary": "editAccount 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CatalogActionBean.viewCategory",
+   "type": "endpoint",
+   "name": "viewCategory",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+   "lineRange": [
+    153,
+    154
+   ],
+   "summary": "viewCategory 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CatalogActionBean.viewProduct",
+   "type": "endpoint",
+   "name": "viewProduct",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+   "lineRange": [
+    166,
+    167
+   ],
+   "summary": "viewProduct 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CatalogActionBean.viewItem",
+   "type": "endpoint",
+   "name": "viewItem",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+   "lineRange": [
+    179,
+    180
+   ],
+   "summary": "viewItem 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CatalogActionBean.searchProducts",
+   "type": "endpoint",
+   "name": "searchProducts",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+   "lineRange": [
+    190,
+    191
+   ],
+   "summary": "searchProducts 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CartActionBean.addItemToCart",
+   "type": "endpoint",
+   "name": "addItemToCart",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+   "lineRange": [
+    68,
+    69
+   ],
+   "summary": "addItemToCart 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CartActionBean.removeItemFromCart",
+   "type": "endpoint",
+   "name": "removeItemFromCart",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+   "lineRange": [
+    94,
+    95
+   ],
+   "summary": "removeItemFromCart 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CartActionBean.updateCartQuantities",
+   "type": "endpoint",
+   "name": "updateCartQuantities",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+   "lineRange": [
+    116,
+    117
+   ],
+   "summary": "updateCartQuantities 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:CartActionBean.checkOut",
+   "type": "endpoint",
+   "name": "checkOut",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+   "lineRange": [
+    141,
+    142
+   ],
+   "summary": "checkOut 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:OrderActionBean.listOrders",
+   "type": "endpoint",
+   "name": "listOrders",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java",
+   "lineRange": [
+    107,
+    108
+   ],
+   "summary": "listOrders 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:OrderActionBean.newOrder",
+   "type": "endpoint",
+   "name": "newOrder",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java",
+   "lineRange": [
+    142,
+    143
+   ],
+   "summary": "newOrder 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "ep:OrderActionBean.viewOrder",
+   "type": "endpoint",
+   "name": "viewOrder",
+   "filePath": "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java",
+   "lineRange": [
+    171,
+    172
+   ],
+   "summary": "viewOrder 요청 처리 (Stripes Resolution)",
+   "tags": [
+    "endpoint"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:SUPPLIER",
+   "type": "table",
+   "name": "SUPPLIER",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    17,
+    18
+   ],
+   "summary": "SUPPLIER 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:SIGNON",
+   "type": "table",
+   "name": "SIGNON",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    30,
+    31
+   ],
+   "summary": "SIGNON 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:ACCOUNT",
+   "type": "table",
+   "name": "ACCOUNT",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    36,
+    37
+   ],
+   "summary": "ACCOUNT 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:PROFILE",
+   "type": "table",
+   "name": "PROFILE",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    52,
+    53
+   ],
+   "summary": "PROFILE 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:BANNERDATA",
+   "type": "table",
+   "name": "BANNERDATA",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    61,
+    62
+   ],
+   "summary": "BANNERDATA 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:ORDERS",
+   "type": "table",
+   "name": "ORDERS",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    67,
+    68
+   ],
+   "summary": "ORDERS 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:ORDERSTATUS",
+   "type": "table",
+   "name": "ORDERSTATUS",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    96,
+    97
+   ],
+   "summary": "ORDERSTATUS 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:LINEITEM",
+   "type": "table",
+   "name": "LINEITEM",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    104,
+    105
+   ],
+   "summary": "LINEITEM 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:CATEGORY",
+   "type": "table",
+   "name": "CATEGORY",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    113,
+    114
+   ],
+   "summary": "CATEGORY 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:PRODUCT",
+   "type": "table",
+   "name": "PRODUCT",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    120,
+    121
+   ],
+   "summary": "PRODUCT 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:ITEM",
+   "type": "table",
+   "name": "ITEM",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    133,
+    134
+   ],
+   "summary": "ITEM 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:INVENTORY",
+   "type": "table",
+   "name": "INVENTORY",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    154,
+    155
+   ],
+   "summary": "INVENTORY 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "tbl:SEQUENCE",
+   "type": "table",
+   "name": "SEQUENCE",
+   "filePath": "src/main/resources/database/jpetstore-hsqldb-schema.sql",
+   "lineRange": [
+    160,
+    161
+   ],
+   "summary": "SEQUENCE 테이블",
+   "tags": [
+    "schema"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "bean:AccountActionBean",
+   "target": "dom:account",
+   "type": "contains_flow",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "svc:AccountService",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "dom:catalog",
+   "type": "contains_flow",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "svc:CatalogService",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "dom:cart",
+   "type": "contains_flow",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "svc:CatalogService",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "dom:order",
+   "type": "contains_flow",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "svc:OrderService",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.newAccount",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.newAccount",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.signon",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.signon",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.signoff",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.signoff",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.editAccount",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:AccountActionBean",
+   "target": "ep:AccountActionBean.editAccount",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewCategory",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewCategory",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewProduct",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewProduct",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewItem",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.viewItem",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.searchProducts",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CatalogActionBean",
+   "target": "ep:CatalogActionBean.searchProducts",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.addItemToCart",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.addItemToCart",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.removeItemFromCart",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.removeItemFromCart",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.updateCartQuantities",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.updateCartQuantities",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.checkOut",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:CartActionBean",
+   "target": "ep:CartActionBean.checkOut",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.listOrders",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.listOrders",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.newOrder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.newOrder",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.viewOrder",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "bean:OrderActionBean",
+   "target": "ep:OrderActionBean.viewOrder",
+   "type": "routes",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:ACCOUNT",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:ACCOUNT",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:SIGNON",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:SIGNON",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:PROFILE",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:AccountMapper",
+   "target": "tbl:PROFILE",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:CategoryMapper",
+   "target": "tbl:CATEGORY",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:CategoryMapper",
+   "target": "tbl:CATEGORY",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ProductMapper",
+   "target": "tbl:PRODUCT",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ProductMapper",
+   "target": "tbl:PRODUCT",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ItemMapper",
+   "target": "tbl:ITEM",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ItemMapper",
+   "target": "tbl:ITEM",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ItemMapper",
+   "target": "tbl:INVENTORY",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:ItemMapper",
+   "target": "tbl:INVENTORY",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:OrderMapper",
+   "target": "tbl:ORDERS",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:OrderMapper",
+   "target": "tbl:ORDERS",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:OrderMapper",
+   "target": "tbl:ORDERSTATUS",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:OrderMapper",
+   "target": "tbl:ORDERSTATUS",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:LineItemMapper",
+   "target": "tbl:LINEITEM",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:LineItemMapper",
+   "target": "tbl:LINEITEM",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:SequenceMapper",
+   "target": "tbl:SEQUENCE",
+   "type": "reads_from",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "map:SequenceMapper",
+   "target": "tbl:SEQUENCE",
+   "type": "writes_to",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:AccountService",
+   "target": "map:AccountMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:CatalogService",
+   "target": "map:CategoryMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:CatalogService",
+   "target": "map:ProductMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:CatalogService",
+   "target": "map:ItemMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:OrderService",
+   "target": "map:OrderMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:OrderService",
+   "target": "map:LineItemMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:OrderService",
+   "target": "map:ItemMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "svc:OrderService",
+   "target": "map:SequenceMapper",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:account",
+   "target": "cls:Account",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:catalog",
+   "target": "cls:Category",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:catalog",
+   "target": "cls:Product",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:catalog",
+   "target": "cls:Item",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:cart",
+   "target": "cls:Cart",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:cart",
+   "target": "cls:CartItem",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:order",
+   "target": "cls:Order",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "dom:order",
+   "target": "cls:LineItem",
+   "type": "flow_step",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ],
+ "tour": []
+}

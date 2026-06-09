@@ -1,5 +1,5 @@
 import type {
-  CanonicalGraph, CanonicalNode, CanonicalEdge, Claim, DocSection, GeneratedDoc,
+  CanonicalGraph, CanonicalNode, CanonicalEdge, Claim, DocSection, GeneratedDoc, ProjectMeta,
 } from "../types.js";
 import { CONFIDENCE_TAG } from "../types.js";
 
@@ -60,6 +60,17 @@ function inferredClaim(text: string): Claim {
   return { claim: text, confidence: "INFERRED", evidence: [], requires_human_review: true };
 }
 
+/**
+ * 언어/프레임워크 claim — build/config 파일(pom.xml 등)을 근거로 인용하면 CONFIRMED_AI
+ * (§5.2 파일 경로만 있어도 허용). configFiles 없으면 INFERRED로 격하.
+ */
+function configClaim(project: ProjectMeta, text: string): Claim {
+  const path = project.configFiles[0];
+  return path
+    ? { claim: text, confidence: "CONFIRMED_AI", evidence: [{ path }], requires_human_review: false }
+    : inferredClaim(text);
+}
+
 // ── 순환 의존 탐지 (02_architecture) ─────────────────────────────────────────
 /** depends_on + imports 엣지에서 사이클에 속한 uid 집합을 결정론적으로 반환. */
 export function detectCycles(graph: CanonicalGraph): string[][] {
@@ -89,8 +100,8 @@ export function detectCycles(graph: CanonicalGraph): string[][] {
 
 // ── 5종 문서 빌더 (결정론 skeleton) ──────────────────────────────────────────
 export function buildTechStack(graph: CanonicalGraph): GeneratedDoc {
-  const langs = graph.project.languages.map((l) => inferredClaim(`사용 언어: ${l}`));
-  const fws = graph.project.frameworks.map((f) => inferredClaim(`프레임워크/라이브러리: ${f}`));
+  const langs = graph.project.languages.map((l) => configClaim(graph.project, `사용 언어: ${l}`));
+  const fws = graph.project.frameworks.map((f) => configClaim(graph.project, `프레임워크/라이브러리: ${f}`));
   const modules = nodesOfKind(graph, "module").map((n) => claimForNode(n, `모듈: ${n.name} — ${n.summary}`));
   return {
     filename: "01_tech-stack.md",
