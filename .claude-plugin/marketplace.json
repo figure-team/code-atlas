@@ -1,10 +1,10 @@
 {
-  "name": "understand-anything",
+  "name": "ktds",
   "metadata": {
-    "description": "LLM-powered codebase analysis producing interactive knowledge graphs, guided tours, and deep-dive explanations"
+    "description": "Code Atlas — U-A 지식 그래프 기반 근거 문서 5종 자동 생성 + 검토/승인/감사 (ktds Legacy 문서 자동화). U-A(MIT) fork."
   },
   "owner": {
-    "name": "Lum1104"
+    "name": "figure-team"
   },
   "plugins": [
     {
