@@ -1,12 +1,12 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import type { ApprovalRecord, Claim, DocState } from "../types.js";
+import type { ApprovalRecord, Claim, Confidence, Evidence, DocState } from "../types.js";
 import { CONFIDENCE_TAG, CLAIMS_FENCE_OPEN, CLAIMS_FENCE_CLOSE } from "../types.js";
 import { setDocState, getDocState, loadDocStatus, transition } from "../doc-state/index.js";
 import { logEvent } from "../audit/index.js";
 
 /**
- * ApprovalWorkflow (plan §3.3 / §7.2): review → confirm [추정] → approve.
+ * ApprovalWorkflow (plan §3.3 / §7.2): review → confirm [추정]·[확정(AI)] → approve.
  * Composes doc-state (transitions) + audit (events). 승인자 식별은 핸들/이니셜만(O3).
  */
 
@@ -31,9 +31,10 @@ export async function startReview(specDir: string, doc: string): Promise<void> {
 }
 
 /**
- * Confirm an [추정]/INFERRED claim as human-confirmed ([확정(담당자)]).
- * Pure data mutation; the confirmer handle is recorded via audit by the caller
- * or via `confirmAndLog`. (`by` is a handle/initials, not a real name — O3.)
+ * Promote a claim to human-confirmed ([확정(담당자)]). The reviewer takes
+ * personal accountability — applies both to [추정]/INFERRED (no evidence) and
+ * to [확정(AI)]/CONFIRMED_AI (AI verified, reviewer now signs off). Evidence is
+ * preserved via spread. (`by` is a handle/initials, not a real name — O3.)
  */
 export function confirmClaim(claim: Claim): Claim {
   return { ...claim, confidence: "CONFIRMED_HUMAN", requires_human_review: false };
@@ -53,54 +54,93 @@ export async function confirmAndLog(
 
 // ── .md ↔ claim 매핑 (plan A17b — 인터랙티브 확정) ──────────────────────────
 // doc-generator renderClaim()의 역방향: 발행된 마크다운에서 claims 펜스 안의
-// `- [추정] ` 라인을 찾아 확정한다. 접두사/펜스는 types.ts 상수에서 조립해
-// 렌더러와 동기화를 유지한다. 펜스 밖(LLM prose)의 유사 불릿은 claim이 아니다.
-const INFERRED_PREFIX = `- ${CONFIDENCE_TAG.INFERRED} `;
+// 확정 대상 라인을 찾아 [확정(담당자)]로 승격한다. 확정 대상 = [추정](INFERRED,
+// 근거 없음) + [확정(AI)](CONFIRMED_AI, AI 근거 있음 → 담당자가 검증·책임 인수).
+// 접두사/펜스는 types.ts 상수에서 조립해 렌더러와 동기화를 유지한다. 펜스
+// 밖(LLM prose)의 유사 불릿은 claim이 아니다.
 const CONFIRMED_PREFIX = `- ${CONFIDENCE_TAG.CONFIRMED_HUMAN} `;
 
-export interface InferredItem {
-  /** 1-based ordinal among the doc's current [추정] items (display order; shifts as items are confirmed). */
+/** Confidence values a reviewer may promote to CONFIRMED_HUMAN, with their bullet prefixes. */
+const CONFIRMABLE: ReadonlyArray<{ from: Confidence; prefix: string }> = [
+  { from: "INFERRED", prefix: `- ${CONFIDENCE_TAG.INFERRED} ` },
+  { from: "CONFIRMED_AI", prefix: `- ${CONFIDENCE_TAG.CONFIRMED_AI} ` },
+];
+
+export interface ConfirmableItem {
+  /** 1-based ordinal among the doc's current confirmable items (display order; shifts as items are confirmed). */
   index: number;
-  /** 1-based line number in the published markdown — stable key for confirmInferredLine. */
+  /** 1-based line number in the published markdown — stable key for confirmLine. */
   line: number;
-  /** Claim text after the tag (any evidence cite suffix preserved verbatim). */
+  /** Current confidence of the line ([추정] vs [확정(AI)]) — what is being promoted from. */
+  from: Confidence;
+  /** Claim text after the tag (evidence cite suffix stripped; see splitCite). */
   text: string;
 }
 
-/** 펜스 안의 [추정] claim 라인들의 0-based 인덱스 집합 (list/confirm 공용 스캔). */
-function scanInferredLines(mdLines: string[]): Set<number> {
-  const hits = new Set<number>();
+/** renderClaim()의 cite 접미사(` — 근거: \`path:line\``)를 claim 본문과 evidence로 역파싱. */
+function splitCite(rest: string): { text: string; evidence: Evidence[] } {
+  const m = rest.match(/^(.*) — 근거: `([^`]+)`$/);
+  if (!m) return { text: rest, evidence: [] };
+  const ref = m[2];
+  const colon = ref.lastIndexOf(":");
+  const hasLine = colon > 0 && /^\d+$/.test(ref.slice(colon + 1));
+  const ev: Evidence = hasLine
+    ? { path: ref.slice(0, colon), line: Number(ref.slice(colon + 1)) }
+    : { path: ref };
+  return { text: m[1], evidence: [ev] };
+}
+
+/**
+ * 라인 본문(접두사 제거 후)을 claim 본문 + evidence로 분해.
+ * INFERRED는 계약상 근거가 없으므로(doc-generator inferredClaim) cite 파싱을 건너뛴다
+ * → rest 전체가 claim 본문이라 [추정] 경로는 이전 동작과 증명적으로 동일.
+ * cite 역파싱은 근거가 있는 CONFIRMED_AI에만 적용한다.
+ */
+function parseClaimBody(from: Confidence, rest: string): { text: string; evidence: Evidence[] } {
+  return from === "CONFIRMED_AI" ? splitCite(rest) : { text: rest, evidence: [] };
+}
+
+/** 펜스 안의 확정 대상 라인 → {from, prefix} (0-based 라인 인덱스 키). list/confirm 공용. */
+function scanConfirmableLines(mdLines: string[]): Map<number, { from: Confidence; prefix: string }> {
+  const hits = new Map<number, { from: Confidence; prefix: string }>();
   let inClaims = false;
   mdLines.forEach((l, i) => {
     if (l === CLAIMS_FENCE_OPEN) inClaims = true;
     else if (l === CLAIMS_FENCE_CLOSE) inClaims = false;
-    else if (inClaims && l.startsWith(INFERRED_PREFIX)) hits.add(i);
+    else if (inClaims) {
+      const match = CONFIRMABLE.find((c) => l.startsWith(c.prefix));
+      if (match) hits.set(i, match);
+    }
   });
   return hits;
 }
 
-/** List the [추정] claim lines of a published doc (`docsDir/doc`). */
-export async function listInferredItems(docsDir: string, doc: string): Promise<InferredItem[]> {
+/** List the confirmable claim lines ([추정]·[확정(AI)]) of a published doc (`docsDir/doc`). */
+export async function listConfirmableItems(docsDir: string, doc: string): Promise<ConfirmableItem[]> {
   const mdLines = (await readFile(join(docsDir, doc), "utf-8")).split("\n");
-  const items: InferredItem[] = [];
-  for (const i of [...scanInferredLines(mdLines)].sort((a, b) => a - b)) {
-    items.push({ index: items.length + 1, line: i + 1, text: mdLines[i].slice(INFERRED_PREFIX.length) });
+  const hits = scanConfirmableLines(mdLines);
+  const items: ConfirmableItem[] = [];
+  for (const i of [...hits.keys()].sort((a, b) => a - b)) {
+    const { from, prefix } = hits.get(i)!;
+    items.push({ index: items.length + 1, line: i + 1, from, text: parseClaimBody(from, mdLines[i].slice(prefix.length)).text });
   }
   return items;
 }
 
 /**
- * Confirm one [추정] line of a published doc as [확정(담당자)] (plan A17b).
+ * Promote one confirmable line ([추정] or [확정(AI)]) to [확정(담당자)] (plan A17b).
  * Guards: non-empty `by` handle (O3 — the only accountability record), doc must
- * be UNDER_REVIEW (review → confirm → approve), and `line` must currently hold
- * an [추정] claim inside the claims fence. Ordering mirrors approveDoc
+ * be UNDER_REVIEW (review → confirm → approve), and `line` must currently hold a
+ * confirmable claim inside the claims fence. Ordering mirrors approveDoc
  * (crash-gap safety): validate → audit (DOC_ITEM_CONFIRMED) → rewrite the .md
- * LAST, so a mid-write failure leaves the tag unconfirmed (retryable; at worst
- * a duplicate audit event) rather than a confirmed tag with no audit trail.
- * 동시 검토자가 같은 라인을 다른 [추정] claim으로 바꿔치기하는 경쟁은 범위 밖
+ * LAST, so a mid-write failure leaves the tag unconfirmed (retryable; at worst a
+ * duplicate audit event) rather than a confirmed tag with no audit trail. The
+ * evidence cite (if any, e.g. from [확정(AI)]) is preserved verbatim in the .md
+ * and round-tripped onto the returned Claim.
+ * 동시 검토자가 같은 라인을 다른 claim으로 바꿔치기하는 경쟁은 범위 밖
  * (UNDER_REVIEW 단일 검토자 가정) — 재검증이 non-claim 오태깅만은 막아준다.
  */
-export async function confirmInferredLine(
+export async function confirmLine(
   specDir: string,
   docsDir: string,
   doc: string,
@@ -117,13 +157,18 @@ export async function confirmInferredLine(
   }
   const path = join(docsDir, doc);
   const lines = (await readFile(path, "utf-8")).split("\n");
-  if (!scanInferredLines(lines).has(line - 1)) {
-    throw new Error(`[approval] ${doc}:${line} is not an ${CONFIDENCE_TAG.INFERRED} claim line`);
+  const hit = scanConfirmableLines(lines).get(line - 1);
+  if (!hit) {
+    throw new Error(
+      `[approval] ${doc}:${line} is not a confirmable claim line ` +
+        `(${CONFIDENCE_TAG.INFERRED}/${CONFIDENCE_TAG.CONFIRMED_AI})`
+    );
   }
-  const text = lines[line - 1].slice(INFERRED_PREFIX.length);
-  const claim: Claim = { claim: text, confidence: "INFERRED", evidence: [], requires_human_review: true };
+  const rest = lines[line - 1].slice(hit.prefix.length);
+  const { text, evidence } = parseClaimBody(hit.from, rest);
+  const claim: Claim = { claim: text, confidence: hit.from, evidence, requires_human_review: hit.from === "INFERRED" };
   const confirmed = await confirmAndLog(specDir, doc, claim, handle);
-  lines[line - 1] = CONFIRMED_PREFIX + text;
+  lines[line - 1] = CONFIRMED_PREFIX + rest; // keep the cite suffix verbatim
   await writeFile(path, lines.join("\n"), "utf-8");
   return confirmed;
 }

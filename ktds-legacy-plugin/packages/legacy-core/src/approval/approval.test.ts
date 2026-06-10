@@ -6,7 +6,7 @@ import type { Claim, GeneratedDoc } from "../types.js";
 import {
   listDrafts, startReview, confirmClaim, confirmAndLog,
   approveDoc, returnDoc, loadApprovals,
-  listInferredItems, confirmInferredLine,
+  listConfirmableItems, confirmLine,
 } from "./index.js";
 import { setDocState, getDocState } from "../doc-state/index.js";
 import { readAudit } from "../audit/index.js";
@@ -93,24 +93,28 @@ describe("approval workflow", () => {
       await writeFile(join(docsDir, DOC), renderMarkdown(doc), "utf-8");
     });
 
-    it("listInferredItems finds only [추정] lines with ordinal + line number", async () => {
-      const items = await listInferredItems(docsDir, DOC);
-      expect(items.map((i) => i.text)).toEqual(["레이어: web (3개 구성요소)", "레이어: dao (2개 구성요소)"]);
-      expect(items.map((i) => i.index)).toEqual([1, 2]);
-      const md = (await readFile(join(docsDir, DOC), "utf-8")).split("\n");
-      for (const it of items) expect(md[it.line - 1]).toBe(`- [추정] ${it.text}`);
+    it("listConfirmableItems finds [추정] AND [확정(AI)] lines with ordinal + line + from", async () => {
+      const items = await listConfirmableItems(docsDir, DOC);
+      expect(items.map((i) => i.text)).toEqual([
+        "레이어: web (3개 구성요소)", "의존: A → B", "레이어: dao (2개 구성요소)",
+      ]);
+      expect(items.map((i) => i.index)).toEqual([1, 2, 3]);
+      expect(items.map((i) => i.from)).toEqual(["INFERRED", "CONFIRMED_AI", "INFERRED"]);
+      // [확정(AI)] 항목의 cite는 text에서 분리되어 보인다.
+      expect(items[1].text).toBe("의존: A → B");
     });
 
-    it("confirmInferredLine rewrites the tag, keeps others, and audits (A17b)", async () => {
+    it("confirmLine promotes an [추정] line, keeps others, and audits (A17b)", async () => {
       await setDocState(dir, DOC, "UNDER_REVIEW");
-      const [first] = await listInferredItems(docsDir, DOC);
-      const out = await confirmInferredLine(dir, docsDir, DOC, first.line, "kim");
+      const first = (await listConfirmableItems(docsDir, DOC)).find((i) => i.from === "INFERRED")!;
+      const out = await confirmLine(dir, docsDir, DOC, first.line, "kim");
       expect(out.confidence).toBe("CONFIRMED_HUMAN");
+      expect(out.evidence).toEqual([]); // INFERRED는 근거 없음
 
       const md = await readFile(join(docsDir, DOC), "utf-8");
       expect(md).toContain("- [확정(담당자)] 레이어: web (3개 구성요소)");
-      expect(md).toContain("- [추정] 레이어: dao (2개 구성요소)"); // 나머지는 그대로
-      expect(md).toContain("- [확정(AI)] 의존: A → B"); // 무관 라인 불변
+      expect(md).toContain("- [추정] 레이어: dao (2개 구성요소)"); // 나머지 추정은 그대로
+      expect(md).toContain("- [확정(AI)] 의존: A → B — 근거: `src/Web.java:7`"); // AI 라인 불변
 
       const events = await readAudit(dir);
       expect(events).toHaveLength(1);
@@ -118,27 +122,66 @@ describe("approval workflow", () => {
         type: "DOC_ITEM_CONFIRMED", doc: DOC, by: "kim",
         detail: { claim: "레이어: web (3개 구성요소)" },
       });
+    });
 
-      const remaining = await listInferredItems(docsDir, DOC);
-      expect(remaining.map((i) => i.text)).toEqual(["레이어: dao (2개 구성요소)"]);
-      expect(remaining[0].index).toBe(1); // 순번은 재계산
+    it("confirmLine promotes a [확정(AI)] line to [확정(담당자)], preserving its evidence cite", async () => {
+      await setDocState(dir, DOC, "UNDER_REVIEW");
+      const ai = (await listConfirmableItems(docsDir, DOC)).find((i) => i.from === "CONFIRMED_AI")!;
+      const out = await confirmLine(dir, docsDir, DOC, ai.line, "kim");
+      expect(out.confidence).toBe("CONFIRMED_HUMAN");
+      expect(out.evidence).toEqual([{ path: "src/Web.java", line: 7 }]); // 근거 round-trip 보존
+
+      const md = await readFile(join(docsDir, DOC), "utf-8");
+      // 태그만 승격, cite는 .md에 그대로
+      expect(md).toContain("- [확정(담당자)] 의존: A → B — 근거: `src/Web.java:7`");
+      expect(md).not.toContain("- [확정(AI)] 의존: A → B");
+
+      const events = await readAudit(dir);
+      // 감사 claim 텍스트는 cite 제거된 본문
+      expect(events[0]).toMatchObject({ type: "DOC_ITEM_CONFIRMED", detail: { claim: "의존: A → B" } });
+
+      // 승격된 라인은 더 이상 확정 대상이 아니다 (순번 재계산)
+      const remaining = await listConfirmableItems(docsDir, DOC);
+      expect(remaining.map((i) => i.from)).toEqual(["INFERRED", "INFERRED"]);
+    });
+
+    it("promotes a [확정(AI)] line whose cite has no line number ({path} only)", async () => {
+      // configClaim 처럼 evidence가 {path} 뿐인 AI 라인 (예: pom.xml).
+      const doc: GeneratedDoc = {
+        filename: DOC,
+        title: "기술 스택",
+        sections: [{
+          heading: "프레임워크",
+          claims: [{ claim: "프레임워크/라이브러리: Spring", confidence: "CONFIRMED_AI", evidence: [{ path: "pom.xml" }], requires_human_review: false }],
+        }],
+      };
+      await writeFile(join(docsDir, DOC), renderMarkdown(doc), "utf-8");
+      await setDocState(dir, DOC, "UNDER_REVIEW");
+
+      const [item] = await listConfirmableItems(docsDir, DOC);
+      expect(item.text).toBe("프레임워크/라이브러리: Spring"); // cite 분리됨
+      const out = await confirmLine(dir, docsDir, DOC, item.line, "kim");
+      expect(out.evidence).toEqual([{ path: "pom.xml" }]); // line 없는 evidence round-trip
+
+      const md = await readFile(join(docsDir, DOC), "utf-8");
+      expect(md).toContain("- [확정(담당자)] 프레임워크/라이브러리: Spring — 근거: `pom.xml`");
     });
 
     it("rejects confirm unless UNDER_REVIEW (review → confirm → approve)", async () => {
-      const [first] = await listInferredItems(docsDir, DOC); // doc은 DRAFT(기본)
-      await expect(confirmInferredLine(dir, docsDir, DOC, first.line, "kim"))
+      const [first] = await listConfirmableItems(docsDir, DOC); // doc은 DRAFT(기본)
+      await expect(confirmLine(dir, docsDir, DOC, first.line, "kim"))
         .rejects.toThrow(/cannot confirm in state DRAFT/);
       // 가드 실패 시 파일/감사 모두 무변경
       expect(await readFile(join(docsDir, DOC), "utf-8")).toContain("- [추정] 레이어: web");
       expect(await readAudit(dir)).toEqual([]);
     });
 
-    it("rejects a line that is not an [추정] claim", async () => {
+    it("rejects a line that is not a confirmable claim", async () => {
       await setDocState(dir, DOC, "UNDER_REVIEW");
-      await expect(confirmInferredLine(dir, docsDir, DOC, 1, "kim")) // L1 = "# 아키텍처"
-        .rejects.toThrow(/is not an \[추정\] claim line/);
-      await expect(confirmInferredLine(dir, docsDir, DOC, 9999, "kim"))
-        .rejects.toThrow(/is not an \[추정\] claim line/);
+      await expect(confirmLine(dir, docsDir, DOC, 1, "kim")) // L1 = "# 아키텍처"
+        .rejects.toThrow(/is not a confirmable claim line/);
+      await expect(confirmLine(dir, docsDir, DOC, 9999, "kim"))
+        .rejects.toThrow(/is not a confirmable claim line/);
       expect(await readAudit(dir)).toEqual([]);
     });
 
@@ -154,7 +197,7 @@ describe("approval workflow", () => {
       };
       await writeFile(join(docsDir, DOC), renderMarkdown(doc), "utf-8");
 
-      const items = await listInferredItems(docsDir, DOC);
+      const items = await listConfirmableItems(docsDir, DOC);
       expect(items.map((i) => i.text)).toEqual(["레이어: web (3개 구성요소)"]);
 
       // 산문 라인을 라인 번호로 직접 확정 시도해도 거부 + 무변경
@@ -162,41 +205,43 @@ describe("approval workflow", () => {
       const md = (await readFile(join(docsDir, DOC), "utf-8")).split("\n");
       const proseLine = md.findIndex((l) => l.includes("산문이 흉내 낸")) + 1;
       expect(proseLine).toBeGreaterThan(0);
-      await expect(confirmInferredLine(dir, docsDir, DOC, proseLine, "kim"))
-        .rejects.toThrow(/is not an \[추정\] claim line/);
+      await expect(confirmLine(dir, docsDir, DOC, proseLine, "kim"))
+        .rejects.toThrow(/is not a confirmable claim line/);
       expect(await readAudit(dir)).toEqual([]);
     });
 
     it("double-confirm of the same line is rejected with no second audit event", async () => {
       await setDocState(dir, DOC, "UNDER_REVIEW");
-      const [first] = await listInferredItems(docsDir, DOC);
-      await confirmInferredLine(dir, docsDir, DOC, first.line, "kim");
-      await expect(confirmInferredLine(dir, docsDir, DOC, first.line, "kim"))
-        .rejects.toThrow(/is not an \[추정\] claim line/);
+      const [first] = await listConfirmableItems(docsDir, DOC);
+      await confirmLine(dir, docsDir, DOC, first.line, "kim");
+      await expect(confirmLine(dir, docsDir, DOC, first.line, "kim"))
+        .rejects.toThrow(/is not a confirmable claim line/);
       const confirms = (await readAudit(dir)).filter((e) => e.type === "DOC_ITEM_CONFIRMED");
       expect(confirms).toHaveLength(1);
     });
 
     it("rejects an empty/whitespace confirmer handle (O3)", async () => {
       await setDocState(dir, DOC, "UNDER_REVIEW");
-      const [first] = await listInferredItems(docsDir, DOC);
-      await expect(confirmInferredLine(dir, docsDir, DOC, first.line, "  "))
+      const [first] = await listConfirmableItems(docsDir, DOC);
+      await expect(confirmLine(dir, docsDir, DOC, first.line, "  "))
         .rejects.toThrow(/must be non-empty/);
       expect(await readAudit(dir)).toEqual([]);
       expect(await readFile(join(docsDir, DOC), "utf-8")).toContain("- [추정] 레이어: web");
     });
 
-    it("full review → confirm → approve flow leaves a complete audit trail", async () => {
+    it("full review → confirm-all → approve flow leaves a complete audit trail", async () => {
       await startReview(dir, DOC);
-      for (const it of await listInferredItems(docsDir, DOC)) {
-        await confirmInferredLine(dir, docsDir, DOC, it.line, "kim");
-      }
-      expect(await listInferredItems(docsDir, DOC)).toEqual([]);
+      // 확정 대상 3건([추정]×2 + [확정(AI)]×1) 모두 라인 번호(안정 키)로 확정
+      const lines = (await listConfirmableItems(docsDir, DOC)).map((i) => i.line);
+      for (const line of lines) await confirmLine(dir, docsDir, DOC, line, "kim");
+      expect(await listConfirmableItems(docsDir, DOC)).toEqual([]);
       await approveDoc(dir, DOC, "kim");
       expect(await getDocState(dir, DOC)).toBe("APPROVED");
 
       const types = (await readAudit(dir)).map((e) => e.type);
-      expect(types).toEqual(["DOC_ITEM_CONFIRMED", "DOC_ITEM_CONFIRMED", "DOC_APPROVED"]);
+      expect(types).toEqual([
+        "DOC_ITEM_CONFIRMED", "DOC_ITEM_CONFIRMED", "DOC_ITEM_CONFIRMED", "DOC_APPROVED",
+      ]);
     });
   });
 
