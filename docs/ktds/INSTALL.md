@@ -99,7 +99,7 @@ pnpm -r build                                    # @understand-anything/core + @
 
 빌드 검증:
 ```bash
-pnpm --filter @ktds/legacy-core test     # 115 tests 통과 확인
+pnpm --filter @ktds/legacy-core test     # 126 tests 통과 확인
 ```
 
 ## 6. 디렉터리 구조 (fork 내 격리)

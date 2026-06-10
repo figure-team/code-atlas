@@ -101,12 +101,15 @@ node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md
 #   · "a" = 남은 전체 확정,  "by <핸들>" = 담당자 변경,  "q"/Ctrl+D = 종료
 #   · 확정마다 DOC_ITEM_CONFIRMED 감사(실제 사용 핸들 기록)
 
-# (자동화) 비대화 단건 — 매 호출마다 --by 필요
-node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --list
-node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --item 3 --by ipark
+# (자동화/플러그인) 비대화 — --by 명시 필요 (핸들은 비거나 '-'로 시작 불가)
+node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --list             # 확정 대상 목록
+node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --item 3 --by ipark  # 단건
+node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --all  --by ipark    # 전체(명시)
 ```
 
 > 담당자 핸들을 **디스크에 저장하지 않으므로**(O3), 같은 머신에서 사람이 바뀌면 인터랙티브 세션에서 `by <핸들>`로 바꾸거나 비대화 `--by`로 명시한다. 감사 로그에는 항상 **그 항목을 실제로 확정한 핸들**이 박힌다.
+
+> **플러그인(슬래시 `/understand-docs`)으로 confirm할 때**: 인터랙티브 세션은 **터미널 직접 실행(TTY)에서만** 동작한다. 슬래시는 host(Claude)가 비-TTY로 실행하므로 `confirm --doc <f>`(인자 없이)는 **목록과 안내만 출력하고 아무것도 확정하지 않는다**(임의 전체 확정 방지). host는 목록을 보여주고 **어느 항목·담당자**를 물은 뒤 선택분만 `--item`으로 확정하며, 사용자가 "전체"를 명시한 경우에만 `--all`을 쓴다.
 
 상태기계: `DRAFT → UNDER_REVIEW → APPROVED`, 반려는 `UNDER_REVIEW → RETURNED → DRAFT`. 불법 전이(예: DRAFT를 바로 approve)는 거부된다. 항목 확정은 `UNDER_REVIEW`에서만 허용되나, **`confirm`은 DRAFT 문서를 자동으로 `UNDER_REVIEW`로 올린 뒤 진행**한다(`review --doc` 생략 가능). 단 RETURNED/APPROVED 문서는 자동 전이하지 않고 거부된다 — 반려본은 수정 후 재생성한다.
 
