@@ -3,8 +3,9 @@
 //   생성:   node understand-docs.mjs <projectRoot> [runId]
 //   검토:   node understand-docs.mjs <projectRoot> review --list
 //           node understand-docs.mjs <projectRoot> review --doc <file> [--by <handle>]   (TTY면 [추정]·[확정(AI)] 인터랙티브 확정)
-//   확정:   node understand-docs.mjs <projectRoot> confirm --doc <file> --list
-//           node understand-docs.mjs <projectRoot> confirm --doc <file> --item <n> --by <handle>
+//   확정:   node understand-docs.mjs <projectRoot> confirm --doc <file>                            (TTY: 항목 골라 확정 세션 — 담당자 1회 입력, 세션 중 변경 가능)
+//           node understand-docs.mjs <projectRoot> confirm --doc <file> --list
+//           node understand-docs.mjs <projectRoot> confirm --doc <file> --item <n> --by <handle>   (비대화 1건 — 자동화용)
 //   승인:   node understand-docs.mjs <projectRoot> approve --doc <file> --by <handle>
 //   반려:   node understand-docs.mjs <projectRoot> return  --doc <file>
 //   감사:   node understand-docs.mjs <projectRoot> audit --list | audit --date <YYYY-MM-DD>
@@ -44,29 +45,56 @@ async function tagCounts(doc) {
   };
 }
 
-// 확정 대상([추정]·[확정(AI)])을 하나씩 보여주며 y/n/q 로 [확정(담당자)] 승격하는
-// 인터랙티브 루프 (plan A17b). 확정 즉시 .md 태그 치환 + DOC_ITEM_CONFIRMED 감사.
-// 라인 번호가 안정 키라서 도중 확정으로 순번이 줄어도 스냅샷 순회가 안전하다
-// (태그 치환은 라인 수 불변).
+// 인터랙티브 확정 세션 (plan A17b). 확정 대상([추정]·[확정(AI)])을 목록으로 보여주고
+// 항목 번호로 콕 집어 [확정(담당자)] 승격한다. 확정 즉시 .md 태그 치환 + DOC_ITEM_CONFIRMED
+// 감사. 라인 번호가 안정 키라 확정으로 순번이 줄어도 안전(매 확정 후 목록 재계산).
+//
+// 담당자 핸들은 이번 실행(세션) 동안만 메모리에 유지 — 최초 1회 입력 후 재사용, 세션 중
+// `by <핸들>`로 변경 가능, 디스크 미저장(O3: 실명/사번 미저장, 감사엔 실제 사용 핸들만 기록).
 async function interactiveConfirm(doc, byFlag) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  // EOF(Ctrl+D)로 닫히면 question이 reject → null 반환해 정상 종료(q와 동일) 처리.
-  const ask = (q) => rl.question(q).catch(() => null);
+  const ask = (q) => rl.question(q).catch(() => null); // EOF(Ctrl+D) → null
+  let by = byFlag?.trim() || "";
+  let confirmed = 0;
   try {
-    const by = byFlag?.trim() || ((await ask("확정 담당자 핸들/이니셜 (엔터 = 확정 생략): ")) ?? "").trim();
-    if (!by) { console.log("  핸들 미입력 — 확정 단계 생략"); return; }
-    const items = await listConfirmableItems(docDir, doc);
-    let confirmed = 0;
-    for (const it of items) {
-      const ans = (await ask(`  [${it.index}/${items.length}] ${TAGLABEL[it.from]} ${it.text}\n    [확정(담당자)]로 확정? [y/N/q] `))
-        ?.trim().toLowerCase();
-      if (ans == null || ans === "q") break;
-      if (ans !== "y") continue;
-      await confirmLine(spec, docDir, doc, it.line, by);
-      confirmed++;
-      console.log(`    → [확정(담당자)] (by ${by})`);
+    if (!by) {
+      by = ((await ask("확정 담당자 핸들/이니셜 (엔터 = 취소): ")) ?? "").trim();
+      if (!by) { console.log("  핸들 미입력 — 확정 단계 생략"); return; }
     }
-    console.log(`  확정 ${confirmed}건 / 확정 대상 잔여 ${items.length - confirmed}건`);
+    for (;;) {
+      const items = await listConfirmableItems(docDir, doc);
+      if (items.length === 0) { console.log("  확정 대상 없음 — 세션 종료"); break; }
+      console.log(`\n  담당자: ${by} · 확정 대상 ${items.length}건`);
+      for (const it of items) console.log(`    ${it.index}. ${TAGLABEL[it.from]} ${it.text}`);
+      const ans = ((await ask("  번호=해당 항목 확정 · a=전체 확정 · by <핸들>=담당자 변경 · q=종료 > ")) ?? "").trim();
+      if (ans === "" || ans === "q") break;
+      if (ans === "a") {
+        let ok = 0;
+        for (const it of items) {
+          // 항목별 실패 격리: 한 건이 막혀도(드문 경쟁) 세션을 끊지 않고 계속.
+          try { await confirmLine(spec, docDir, doc, it.line, by); ok++; confirmed++; }
+          catch (e) { console.log(`    #${it.index} 건너뜀 — ${e.message}`); }
+        }
+        console.log(`    → ${ok}/${items.length}건 [확정(담당자)] (by ${by})`);
+        continue;
+      }
+      if (ans === "by" || ans.startsWith("by ")) {
+        const next = (ans === "by" ? ((await ask("    새 담당자 핸들: ")) ?? "") : ans.slice(3)).trim();
+        if (next) { by = next; console.log(`    담당자 → ${by}`); }
+        else console.log("    변경 취소(빈 핸들)");
+        continue;
+      }
+      if (/^\d+$/.test(ans)) {
+        const it = items.find((x) => x.index === Number(ans));
+        if (!it) { console.log(`    항목 ${ans} 없음 (현재 1..${items.length})`); continue; }
+        await confirmLine(spec, docDir, doc, it.line, by);
+        confirmed++;
+        console.log(`    #${it.index} → [확정(담당자)] (by ${by})`);
+        continue;
+      }
+      console.log("    인식 못한 입력 — 번호 / a / by <핸들> / q");
+    }
+    console.log(confirmed > 0 ? `  확정 ${confirmed}건 완료.` : "  확정 없이 종료.");
   } finally {
     rl.close();
   }

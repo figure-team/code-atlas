@@ -24,8 +24,9 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/understand-docs.mjs <projectRoot> <runId>
 
 ## 검토 / 승인 / 감사 (엔진: doc-state·approval·audit)
 - `review --list` → DRAFT 목록 + [추정]/[확정(AI)]/[확인 필요] 수
-- `review --doc <f> [--by <handle>]` → DRAFT→UNDER_REVIEW; TTY면 확정 대상([추정]·[확정(AI)]) 인터랙티브 확정 → [확정(담당자)] + DOC_ITEM_CONFIRMED
-- `confirm --doc <f> --list` / `confirm --doc <f> --item <n> --by <handle>` → 비대화(스크립트) 확정 — UNDER_REVIEW에서만 허용
+- `review --doc <f> [--by <handle>]` → DRAFT→UNDER_REVIEW; TTY면 인터랙티브 확정 세션 진입
+- **인터랙티브 확정 세션** (`confirm --doc <f>` TTY, 또는 위 `review --doc`): 확정 대상 목록을 보여주고 **항목 번호로 콕 집어** [확정(담당자)] 승격. 담당자 핸들은 **세션 시작 시 1회만 입력→재사용**(이번 실행 동안 메모리만, 디스크 미저장), 세션 중 `by <핸들>`로 **변경 가능**. `a`=남은 전체 확정, `q`/Ctrl+D=종료. 확정마다 DOC_ITEM_CONFIRMED 감사(실제 사용 핸들 기록).
+- `confirm --doc <f> --list` / `confirm --doc <f> --item <n> --by <handle>` → 비대화(자동화) 확정 — UNDER_REVIEW에서만 허용
   - **확정 대상 = [추정](근거 없음) + [확정(AI)](AI 근거 있음 → 담당자가 검증·책임 인수)**. [확정(AI)]→[확정(담당자)] 승격 시 근거(`파일:라인`) cite는 그대로 보존된다. ([확인 필요]는 확정 대상 아님)
 - `approve --doc <f> --by <handle>` → UNDER_REVIEW→APPROVED, approvals.json + DOC_APPROVED (승인자는 핸들/이니셜만, 실명 미저장)
 - `audit --list | --date <d>` → `.spec/audit/*.jsonl`

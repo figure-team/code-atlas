@@ -45,7 +45,43 @@ ktds는 `Lum1104/Understand-Anything`의 **fork**이며, U-A 스킬(`/understand
 
 > 순서 주의: `/understand-docs`는 U-A가 만든 `knowledge-graph.json`을 읽으므로 **`/understand` 가 먼저** 돌아야 한다. 운영 상세는 [`OPERATOR.md`](./OPERATOR.md), 오류는 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
 
-## 3. 오프라인 설치 (폐쇄망 대비 — Phase 2 본격 지원)
+## 3. 플러그인 업데이트 (새 버전 받기)
+
+> 마켓플레이스 `ktds`는 **서드파티이므로 자동 업데이트가 기본 비활성**이다. 소스 repo가 갱신돼도 Claude Code가 캐시(`~/.claude/plugins/cache/...`)를 자동으로 새로고침하지 **않는다** — 아래를 명시적으로 실행해야 한다.
+
+```bash
+# Claude Code 안에서
+/plugin marketplace update ktds          # 마켓플레이스 메타데이터(=사용 가능한 플러그인 목록) 새로고침
+/plugin install understand-anything@ktds # 해당 플러그인을 최신 버전으로 재설치
+/plugin install ktds-legacy@ktds         # ktds 스킬 최신 버전
+/reload-plugins                          # 현재 세션에 반영 (재시작 불필요; v2.1.143+)
+```
+
+- `/plugin marketplace update ktds`는 **메타데이터만** 새로고침한다. 실제 플러그인 코드는 그 뒤 `install`이 마켓플레이스 소스에서 최신본을 받아온다.
+- **자동 업데이트로 바꾸려면**: `/plugin` → **Marketplaces** 탭 → `ktds` 선택 → **Enable auto-update**. 켜면 세션 시작 시 메타데이터 새로고침 + 설치된 플러그인 자동 갱신.
+- **세션 반영**: `/reload-plugins`로 현재 세션에 즉시 반영(재시작 불필요). 새 세션은 자동으로 최신본을 읽는다.
+- **로컬 경로로 설치한 경우**(`add /abs/path`): 폴더 갱신 후 동일하게 `/plugin marketplace update ktds` → `install` → `/reload-plugins`.
+- 업데이트 후 엔진 재빌드가 필요하면 **첫 실행 시 자동 빌드**가 처리한다(§2의 `ensure-built.mjs`). 새 버전 캐시에 `dist/`가 없으면 1회 자동 빌드된다.
+
+## 4. 플러그인 삭제 (제거)
+
+```bash
+# 개별 플러그인만 제거
+/plugin uninstall ktds-legacy@ktds          # ktds 스킬 제거
+/plugin uninstall understand-anything@ktds  # U-A 제거
+/reload-plugins                             # 현재 세션에 반영
+
+# 마켓플레이스 자체를 제거 (⚠️ 이 마켓플레이스에서 설치한 플러그인이 모두 함께 제거됨)
+/plugin marketplace remove ktds             # = /plugin market rm ktds
+```
+
+- `/plugin marketplace remove ktds`는 경고대로 **`understand-anything@ktds`·`ktds-legacy@ktds` 둘 다 함께 제거**한다. 하나만 빼려면 `/plugin uninstall`을 쓴다.
+- **세션 반영**: 제거 후 `/reload-plugins`(또는 새 세션). 재시작은 불필요.
+- **제거하지 않고 잠시 끄기**: `/plugin disable ktds-legacy@ktds` / 다시 `/plugin enable ktds-legacy@ktds`.
+- **현재 상태 확인**: `/plugin list`(설치 목록), `/plugin marketplace list`(등록된 마켓플레이스).
+- 생성된 산출물(`docs/**`, `.spec/**`)은 플러그인 제거와 **무관하게 분석 대상 프로젝트에 남는다** — 필요 없으면 수동 삭제.
+
+## 5. 오프라인 설치 (폐쇄망 대비 — Phase 2 본격 지원)
 
 ```bash
 git clone https://github.com/figure-team/code-atlas ./code-atlas   # fork 전체(U-A 포함) 복제
@@ -66,7 +102,7 @@ pnpm -r build                                    # @understand-anything/core + @
 pnpm --filter @ktds/legacy-core test     # 115 tests 통과 확인
 ```
 
-## 4. 디렉터리 구조 (fork 내 격리)
+## 6. 디렉터리 구조 (fork 내 격리)
 
 ```
 <ktds-fork>/
@@ -82,7 +118,9 @@ pnpm --filter @ktds/legacy-core test     # 115 tests 통과 확인
 
 > **원본 보존:** U-A 코드/스킬은 수정하지 않는다. 매니페스트 2곳(marketplace/workspace)만 additive. upstream 추종은 [`UPSTREAM_MERGE.md`](./UPSTREAM_MERGE.md) 참조.
 
-## 5. 업그레이드 (U-A 추종)
+## 7. upstream 추종 (U-A 병합 — 개발자/메인테이너용)
+
+> §3(플러그인 업데이트)이 **사용자가 새 버전을 받는** 절차라면, 이쪽은 **메인테이너가 U-A 원본 변경을 fork에 병합**하는 절차다.
 
 ```bash
 git fetch upstream && git merge upstream/main   # 충돌은 매니페스트 2곳 한정
