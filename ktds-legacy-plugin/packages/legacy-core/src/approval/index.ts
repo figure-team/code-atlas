@@ -54,8 +54,11 @@ export async function confirmAndLog(
 
 // ── .md ↔ claim 매핑 (plan A17b — 인터랙티브 확정) ──────────────────────────
 // doc-generator renderClaim()의 역방향: 발행된 마크다운에서 claims 펜스 안의
-// 확정 대상 라인을 찾아 [확정(담당자)]로 승격한다. 확정 대상 = [추정](INFERRED,
-// 근거 없음) + [확정(AI)](CONFIRMED_AI, AI 근거 있음 → 담당자가 검증·책임 인수).
+// 확정 대상 라인을 찾아 [확정(담당자)]로 승격한다. 확정 대상 = [확정(담당자)]가
+// 아닌 모든 claim:
+//   · [추정](INFERRED, 근거 없음)
+//   · [확정(AI)](CONFIRMED_AI, AI 근거 있음 → 담당자가 검증·책임 인수)
+//   · [확인 필요](NEEDS_REVIEW, 사람 판단 필요 → 담당자가 검토·확정)
 // 접두사/펜스는 types.ts 상수에서 조립해 렌더러와 동기화를 유지한다. 펜스
 // 밖(LLM prose)의 유사 불릿은 claim이 아니다.
 const CONFIRMED_PREFIX = `- ${CONFIDENCE_TAG.CONFIRMED_HUMAN} `;
@@ -64,6 +67,7 @@ const CONFIRMED_PREFIX = `- ${CONFIDENCE_TAG.CONFIRMED_HUMAN} `;
 const CONFIRMABLE: ReadonlyArray<{ from: Confidence; prefix: string }> = [
   { from: "INFERRED", prefix: `- ${CONFIDENCE_TAG.INFERRED} ` },
   { from: "CONFIRMED_AI", prefix: `- ${CONFIDENCE_TAG.CONFIRMED_AI} ` },
+  { from: "NEEDS_REVIEW", prefix: `- ${CONFIDENCE_TAG.NEEDS_REVIEW} ` },
 ];
 
 export interface ConfirmableItem {
@@ -71,7 +75,7 @@ export interface ConfirmableItem {
   index: number;
   /** 1-based line number in the published markdown — stable key for confirmLine. */
   line: number;
-  /** Current confidence of the line ([추정] vs [확정(AI)]) — what is being promoted from. */
+  /** Current confidence ([추정]/[확정(AI)]/[확인 필요]) — what is being promoted from. */
   from: Confidence;
   /** Claim text after the tag (evidence cite suffix stripped; see splitCite). */
   text: string;
@@ -92,9 +96,9 @@ function splitCite(rest: string): { text: string; evidence: Evidence[] } {
 
 /**
  * 라인 본문(접두사 제거 후)을 claim 본문 + evidence로 분해.
- * INFERRED는 계약상 근거가 없으므로(doc-generator inferredClaim) cite 파싱을 건너뛴다
- * → rest 전체가 claim 본문이라 [추정] 경로는 이전 동작과 증명적으로 동일.
- * cite 역파싱은 근거가 있는 CONFIRMED_AI에만 적용한다.
+ * INFERRED·NEEDS_REVIEW는 계약상 근거가 없으므로(doc-generator inferredClaim/
+ * cycleClaims) cite 파싱을 건너뛴다 → rest 전체가 claim 본문이라 해당 경로는
+ * 이전 동작과 증명적으로 동일. cite 역파싱은 근거가 있는 CONFIRMED_AI에만 적용한다.
  */
 function parseClaimBody(from: Confidence, rest: string): { text: string; evidence: Evidence[] } {
   return from === "CONFIRMED_AI" ? splitCite(rest) : { text: rest, evidence: [] };
@@ -115,7 +119,7 @@ function scanConfirmableLines(mdLines: string[]): Map<number, { from: Confidence
   return hits;
 }
 
-/** List the confirmable claim lines ([추정]·[확정(AI)]) of a published doc (`docsDir/doc`). */
+/** List the confirmable claim lines ([추정]·[확정(AI)]·[확인 필요]) of a published doc (`docsDir/doc`). */
 export async function listConfirmableItems(docsDir: string, doc: string): Promise<ConfirmableItem[]> {
   const mdLines = (await readFile(join(docsDir, doc), "utf-8")).split("\n");
   const hits = scanConfirmableLines(mdLines);
@@ -128,7 +132,7 @@ export async function listConfirmableItems(docsDir: string, doc: string): Promis
 }
 
 /**
- * Promote one confirmable line ([추정] or [확정(AI)]) to [확정(담당자)] (plan A17b).
+ * Promote one confirmable line ([추정]/[확정(AI)]/[확인 필요]) to [확정(담당자)] (plan A17b).
  * Guards: non-empty `by` handle (O3 — the only accountability record), doc must
  * be UNDER_REVIEW (review → confirm → approve), and `line` must currently hold a
  * confirmable claim inside the claims fence. Ordering mirrors approveDoc
@@ -161,7 +165,7 @@ export async function confirmLine(
   if (!hit) {
     throw new Error(
       `[approval] ${doc}:${line} is not a confirmable claim line ` +
-        `(${CONFIDENCE_TAG.INFERRED}/${CONFIDENCE_TAG.CONFIRMED_AI})`
+        `(${CONFIDENCE_TAG.INFERRED}/${CONFIDENCE_TAG.CONFIRMED_AI}/${CONFIDENCE_TAG.NEEDS_REVIEW})`
     );
   }
   const rest = lines[line - 1].slice(hit.prefix.length);

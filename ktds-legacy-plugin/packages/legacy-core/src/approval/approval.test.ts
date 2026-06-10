@@ -78,6 +78,8 @@ describe("approval workflow", () => {
       ({ claim: text, confidence: "INFERRED", evidence: [], requires_human_review: true });
     const confirmedAi = (text: string): Claim =>
       ({ claim: text, confidence: "CONFIRMED_AI", evidence: [{ path: "src/Web.java", line: 7 }], requires_human_review: false });
+    const needsReview = (text: string): Claim =>
+      ({ claim: text, confidence: "NEEDS_REVIEW", evidence: [], requires_human_review: true });
 
     beforeEach(async () => {
       docsDir = join(dir, "docs");
@@ -165,6 +167,32 @@ describe("approval workflow", () => {
 
       const md = await readFile(join(docsDir, DOC), "utf-8");
       expect(md).toContain("- [확정(담당자)] 프레임워크/라이브러리: Spring — 근거: `pom.xml`");
+    });
+
+    it("promotes a [확인 필요] (NEEDS_REVIEW) line to [확정(담당자)]", async () => {
+      // 순환 의존 후보처럼 사람 판단이 필요한 NEEDS_REVIEW 항목.
+      const doc: GeneratedDoc = {
+        filename: DOC,
+        title: "아키텍처",
+        sections: [{
+          heading: "순환 의존 후보",
+          claims: [needsReview("순환 의존 후보: A → B → A"), inferred("레이어: web")],
+        }],
+      };
+      await writeFile(join(docsDir, DOC), renderMarkdown(doc), "utf-8");
+      await setDocState(dir, DOC, "UNDER_REVIEW");
+
+      const items = await listConfirmableItems(docsDir, DOC);
+      expect(items.map((i) => i.from)).toEqual(["NEEDS_REVIEW", "INFERRED"]); // 확인 필요도 대상에 포함
+      const nr = items.find((i) => i.from === "NEEDS_REVIEW")!;
+      const out = await confirmLine(dir, docsDir, DOC, nr.line, "kim");
+      expect(out.confidence).toBe("CONFIRMED_HUMAN");
+      expect(out.evidence).toEqual([]); // NEEDS_REVIEW는 근거 없음
+
+      const md = await readFile(join(docsDir, DOC), "utf-8");
+      expect(md).toContain("- [확정(담당자)] 순환 의존 후보: A → B → A");
+      expect(md).not.toContain("- [확인 필요] 순환 의존 후보");
+      expect(await readAudit(dir)).toMatchObject([{ type: "DOC_ITEM_CONFIRMED", detail: { claim: "순환 의존 후보: A → B → A" } }]);
     });
 
     it("rejects confirm unless UNDER_REVIEW (review → confirm → approve)", async () => {

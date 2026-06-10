@@ -9,13 +9,21 @@ U-A /understand                → .understand-anything/knowledge-graph.json
   → ktds /understand-init      → understanding.config.json + .spec/
   → ktds /understand-docs      → docs/*.md (5종, DRAFT) + 근거·태그
       review --list/--doc      → DRAFT→UNDER_REVIEW
+      confirm --doc            → 항목 확정 [추정]·[확정(AI)]→[확정(담당자)] + 감사
       approve --doc --by       → UNDER_REVIEW→APPROVED + 감사
       return --doc             → UNDER_REVIEW→RETURNED
       audit --list/--date      → 감사 로그 조회
   → ktds /understand-export    → 단일 HTML (CDN 없음)
 ```
 
-Claude Code에서는 `/understand-init` 등 슬래시 명령으로, 직접 실행 시 `node ktds-legacy-plugin/scripts/understand-*.mjs <projectRoot>` 로 호출한다(아래 예시는 후자).
+### 호출 방식 — 두 가지 (아래 모든 예시는 ②로 표기)
+
+| | 누가 | 형태 |
+| --- | --- | --- |
+| **①** | 플러그인 설치 사용자 | 슬래시 **`/understand-docs <projectRoot> <서브커맨드>`** — Claude(host)가 내부적으로 ②를 실행 |
+| **②** | 직접 / 개발 | **`node ${CLAUDE_PLUGIN_ROOT}/scripts/understand-docs.mjs <projectRoot> <서브커맨드>`** |
+
+> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬 4종: `/understand`(U-A) · `/understand-init` · `/understand-docs` · `/understand-export`. (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
 
 ## 1. 사전: 지식 그래프 생성 (U-A)
 
@@ -83,7 +91,7 @@ node …/understand-docs.mjs <root> audit --date 2026-06-09
 
 ### 4-1. 항목 확정 ([추정]·[확정(AI)] → [확정(담당자)])
 
-승인(approve)은 **문서 단위**다. 그 전에, 문서 안의 개별 claim을 담당자가 **항목 단위**로 확정한다. 확정 대상은 **[추정]**(근거 없음)과 **[확정(AI)]**(AI 근거 있음 → 담당자가 검증·책임 인수) 두 종류. ([확인 필요]는 확정 대상 아님)
+승인(approve)은 **문서 단위**다. 그 전에, 문서 안의 개별 claim을 담당자가 **항목 단위**로 확정한다. 확정 대상은 **[확정(담당자)]가 아닌 모든 claim** — **[추정]**(근거 없음) · **[확정(AI)]**(AI 근거 있음 → 담당자가 검증·책임 인수) · **[확인 필요]**(순환 의존 후보 등 사람 판단 필요 → 담당자가 검토·확정).
 
 ```bash
 # (권장) 인터랙티브 확정 세션 — UNDER_REVIEW 문서에서

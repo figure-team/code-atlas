@@ -11,7 +11,6 @@
 //   감사:   node understand-docs.mjs <projectRoot> audit --list | audit --date <YYYY-MM-DD>
 //
 // 결정론 skeleton만 생성. 실제 LLM 산문은 host CLI(Claude)가 SKILL.md 지시로 채운다.
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { ensureBuilt } from "./ensure-built.mjs";
@@ -26,7 +25,7 @@ const {
 
 const SUBS = ["review", "approve", "return", "audit", "confirm"];
 // 확정 대상의 현재 신뢰도 → 표시 태그 (engine ConfirmableItem.from).
-const TAGLABEL = { INFERRED: "[추정]", CONFIRMED_AI: "[확정(AI)]" };
+const TAGLABEL = { INFERRED: "[추정]", CONFIRMED_AI: "[확정(AI)]", NEEDS_REVIEW: "[확인 필요]" };
 const argv = process.argv.slice(2);
 const root = argv[0] && !argv[0].startsWith("-") && !SUBS.includes(argv[0]) ? argv[0] : process.cwd();
 const rest = argv[0] === root ? argv.slice(1) : argv;
@@ -36,12 +35,14 @@ const has = (n) => rest.includes(n);
 const spec = join(root, ".spec");
 const docDir = join(root, "docs");
 
-async function tagCounts(doc) {
-  const md = await readFile(join(docDir, doc), "utf-8").catch(() => "");
+// 확정 대상 태그별 개수 — 펜스 안 claim만(engine listConfirmableItems와 동일 기준).
+// review --list/--doc 가 같은 카운터를 쓰도록 통일(prose 속 유사 태그 미집계).
+async function confirmableCounts(doc) {
+  const items = await listConfirmableItems(docDir, doc).catch(() => []);
   return {
-    inferred: (md.match(/\[추정\]/g) || []).length,
-    ai: (md.match(/\[확정\(AI\)\]/g) || []).length,
-    review: (md.match(/\[확인 필요\]/g) || []).length,
+    inferred: items.filter((i) => i.from === "INFERRED").length,
+    ai: items.filter((i) => i.from === "CONFIRMED_AI").length,
+    review: items.filter((i) => i.from === "NEEDS_REVIEW").length,
   };
 }
 
@@ -105,18 +106,18 @@ try {
     const drafts = await listDrafts(spec);
     console.log(`DRAFT 문서 ${drafts.length}건:`);
     for (const d of drafts) {
-      const t = await tagCounts(d.doc);
+      const t = await confirmableCounts(d.doc);
       console.log(`  - ${d.doc}   [추정] ${t.inferred} · [확정(AI)] ${t.ai} · [확인 필요] ${t.review}`);
     }
   } else if (sub === "review" && flag("--doc")) {
     const doc = flag("--doc");
     await startReview(spec, doc);
     const items = await listConfirmableItems(docDir, doc);
-    const t = await tagCounts(doc);
     const nInf = items.filter((i) => i.from === "INFERRED").length;
     const nAi = items.filter((i) => i.from === "CONFIRMED_AI").length;
+    const nNr = items.filter((i) => i.from === "NEEDS_REVIEW").length;
     console.log(`검토 시작: ${doc} → ${await getDocState(spec, doc)}`);
-    console.log(`  확정 대상 ${items.length}건 ([추정] ${nInf} · [확정(AI)] ${nAi}) · [확인 필요] ${t.review}건 (담당자 확정 후 approve)`);
+    console.log(`  확정 대상 ${items.length}건 ([추정] ${nInf} · [확정(AI)] ${nAi} · [확인 필요] ${nNr}) (담당자 확정 후 approve)`);
     if (items.length > 0) {
       if (process.stdin.isTTY) await interactiveConfirm(doc, flag("--by"));
       else console.log(`  비대화 모드 — confirm --doc ${doc} --list 로 확인 후 confirm --doc ${doc} --item <n> --by <handle>`);
