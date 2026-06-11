@@ -40,7 +40,7 @@ export function buildActionBeanIndex(
       links.push({
         name: cls.name,
         superclass: cls.superclass,
-        interfaces: cls.interfaces,
+        interfaces: cls.interfaces.map((i) => i.name),
       });
     }
   }

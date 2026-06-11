@@ -3,13 +3,27 @@ import * as path from "node:path";
 import { scanJavaFile, type JavaFileFacts } from "./java-facts.js";
 import { assignRouteIds, sortBatchEntries } from "./route-key.js";
 import { buildCensus } from "./census.js";
-import { gitCommitHash, writeCensus, writeRoutes } from "./persist.js";
+import {
+  gitCommitHash,
+  writeCensus,
+  writeEdges,
+  writeRoutes,
+  writeSlices,
+} from "./persist.js";
 import {
   type BatchEntry,
   type CensusReport,
+  type EdgesReport,
   type RouteEntry,
   type RoutesReport,
+  type SlicesReport,
 } from "./types.js";
+import {
+  buildClassIndex,
+  buildMapperNamespaceIndex,
+  collectEdges,
+} from "./edges.js";
+import { buildSlices, DEFAULT_DEPTH_CAP } from "./slices.js";
 import { buildSpringIndexes, extractSpringRoutes } from "./routes/spring.js";
 import { buildActionBeanIndex, extractStripesRoutes } from "./routes/stripes.js";
 import { extractWebXmlRoutes } from "./routes/web-xml.js";
@@ -26,21 +40,33 @@ import { classifyNextJsFile, nextJsRoutesFor } from "./routes/nextjs.js";
 
 type UnassignedRoute = Omit<RouteEntry, "routeId">;
 
-export async function extractRoutes(
+/**
+ * Single Java parse pass shared by S2 routes and S3 edges — one tree-sitter
+ * parse per file is the M4 budget's backbone.
+ */
+export async function parseJavaFacts(
   projectRoot: string,
   census: CensusReport,
-): Promise<RoutesReport> {
-  const routes: UnassignedRoute[] = [];
-  const batchEntries: BatchEntry[] = [];
-  let contextPath: string | null = null;
-
-  // Pass 1 — parse every Java file once; all Java extractors share the facts.
+): Promise<Map<string, JavaFileFacts>> {
   const javaFacts = new Map<string, JavaFileFacts>();
   for (const file of census.files) {
     if (file.lang !== "java") continue;
     const content = await readProjectFile(projectRoot, file.relPath);
     javaFacts.set(file.relPath, await scanJavaFile(content));
   }
+  return javaFacts;
+}
+
+export async function extractRoutes(
+  projectRoot: string,
+  census: CensusReport,
+  preParsedJavaFacts?: Map<string, JavaFileFacts>,
+): Promise<RoutesReport> {
+  const routes: UnassignedRoute[] = [];
+  const batchEntries: BatchEntry[] = [];
+  let contextPath: string | null = null;
+
+  const javaFacts = preParsedJavaFacts ?? (await parseJavaFacts(projectRoot, census));
   const springIndexes = buildSpringIndexes(javaFacts);
   const actionBeanIndex = buildActionBeanIndex(javaFacts);
 
@@ -110,21 +136,59 @@ function assertUniqueIds(ids: string[], label: string): void {
 }
 
 /**
- * Stage-14 entry point: full census (S1) + route/entry extraction (S2),
- * persisted to .spec/map/{census,routes}.json. Independent of /understand —
- * the KG is consulted only for the cross-check report (ADR D5).
+ * S3: collect call-chain edges from the shared Java facts + MyBatis mapper-XML
+ * namespace index (task 15.1/15.2). Unresolved refs ride along in the report.
  */
-export async function scanDomainMap(projectRoot: string): Promise<{
+export async function extractEdges(
+  projectRoot: string,
+  census: CensusReport,
+  preParsedJavaFacts?: Map<string, JavaFileFacts>,
+): Promise<EdgesReport> {
+  const javaFacts = preParsedJavaFacts ?? (await parseJavaFacts(projectRoot, census));
+  const xmlContents = new Map<string, string>();
+  for (const file of census.files) {
+    if (file.lang !== "xml") continue;
+    xmlContents.set(file.relPath, await readProjectFile(projectRoot, file.relPath));
+  }
+  const classIndex = buildClassIndex(javaFacts);
+  const mapperNamespaces = buildMapperNamespaceIndex(xmlContents);
+  const { edges, unresolved } = collectEdges(javaFacts, classIndex, mapperNamespaces);
+  return {
+    schemaVersion: 1,
+    gitCommit: census.gitCommit,
+    edges,
+    unresolved,
+  };
+}
+
+/**
+ * Stage-14/15 entry point: census (S1) + routes (S2) + call-chain edges (S3) +
+ * reachability slices (S4), persisted to .spec/map/. Independent of
+ * /understand — the KG is consulted only for the cross-check report (ADR D5).
+ */
+export async function scanDomainMap(
+  projectRoot: string,
+  options: { depthCap?: number } = {},
+): Promise<{
   census: CensusReport;
   routes: RoutesReport;
+  edges: EdgesReport;
+  slices: SlicesReport;
   censusPath: string;
   routesPath: string;
+  edgesPath: string;
+  slicesPath: string;
 }> {
   const census = await buildCensus(projectRoot);
-  const routes = await extractRoutes(projectRoot, census);
+  const javaFacts = await parseJavaFacts(projectRoot, census);
+  const routes = await extractRoutes(projectRoot, census, javaFacts);
+  const edges = await extractEdges(projectRoot, census, javaFacts);
+  const slices = buildSlices(census, routes, edges, options.depthCap ?? DEFAULT_DEPTH_CAP);
   const censusPath = await writeCensus(projectRoot, census);
   const routesPath = await writeRoutes(projectRoot, routes);
-  return { census, routes, censusPath, routesPath };
+  const edgesPath = await writeEdges(projectRoot, edges);
+  const slicesPath = await writeSlices(projectRoot, slices);
+  return { census, routes, edges, slices, censusPath, routesPath, edgesPath, slicesPath };
 }
 
 /**

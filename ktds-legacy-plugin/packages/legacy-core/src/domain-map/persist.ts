@@ -4,10 +4,14 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
   CENSUS_FILENAME,
+  EDGES_FILENAME,
   ROUTES_FILENAME,
+  SLICES_FILENAME,
   SPEC_MAP_DIR,
   type CensusReport,
+  type EdgesReport,
   type RoutesReport,
+  type SlicesReport,
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -49,6 +53,20 @@ export async function writeRoutes(
   routes: RoutesReport,
 ): Promise<string> {
   return writeMapArtifact(projectRoot, ROUTES_FILENAME, routes);
+}
+
+export async function writeEdges(
+  projectRoot: string,
+  edges: EdgesReport,
+): Promise<string> {
+  return writeMapArtifact(projectRoot, EDGES_FILENAME, edges);
+}
+
+export async function writeSlices(
+  projectRoot: string,
+  slices: SlicesReport,
+): Promise<string> {
+  return writeMapArtifact(projectRoot, SLICES_FILENAME, slices);
 }
 
 /** HEAD commit hash, or null outside a git work tree (SVN/no-VCS projects). */

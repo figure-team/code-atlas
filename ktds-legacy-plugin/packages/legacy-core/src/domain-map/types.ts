@@ -14,6 +14,8 @@ export const SPEC_MAP_DIR = "map";
 
 export const CENSUS_FILENAME = "census.json";
 export const ROUTES_FILENAME = "routes.json";
+export const EDGES_FILENAME = "edges.json";
+export const SLICES_FILENAME = "slices.json";
 
 // ── Census (S1) ────────────────────────────────────────────────────────────
 
@@ -161,6 +163,87 @@ export const BatchEntrySchema = z.object({
   notes: z.array(z.string()),
 });
 export type BatchEntry = z.infer<typeof BatchEntrySchema>;
+
+// ── Call-chain edges (S3, Stage-15) ────────────────────────────────────────
+
+export const EDGE_KINDS = [
+  /** Resolved import statement. */
+  "import",
+  /** @Autowired/@Resource/@Inject field type. */
+  "injection",
+  /** Plain field type resolved via import/same-package/unique candidate. */
+  "field-type",
+  /** Constructor parameter type (Spring constructor injection). */
+  "ctor-param",
+  /** class → superclass file. */
+  "extends",
+  /** class → implemented interface file. */
+  "implements",
+  /** interface → implementor (name convention *Impl/*ServiceImpl OR explicit implements). */
+  "impl",
+  /** Java string call "ns.id" → MyBatis mapper XML (SqlSession pattern). */
+  "mybatis",
+  /** Typed mapper interface (FQN == namespace) → mapper XML. */
+  "mapper-xml",
+] as const;
+export type EdgeKind = (typeof EDGE_KINDS)[number];
+
+export const FileEdgeSchema = z.object({
+  /** Project-relative path of the depending file. */
+  source: z.string(),
+  /** Project-relative path of the dependency. */
+  target: z.string(),
+  kind: z.enum(EDGE_KINDS),
+  /** 1-based evidence line in source when the signal has one (imports, fields, calls). */
+  line: z.number().int().positive().nullable(),
+});
+export type FileEdge = z.infer<typeof FileEdgeSchema>;
+
+/** Unresolved references are REPORTED, never silently dropped (S4 미해소 큐 원칙). */
+export const UnresolvedRefSchema = z.object({
+  source: z.string(),
+  ref: z.string(),
+  reason: z.enum(["ambiguous", "not-found"]),
+});
+export type UnresolvedRef = z.infer<typeof UnresolvedRefSchema>;
+
+export const EdgesReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  gitCommit: z.string().nullable(),
+  edges: z.array(FileEdgeSchema),
+  unresolved: z.array(UnresolvedRefSchema),
+});
+export type EdgesReport = z.infer<typeof EdgesReportSchema>;
+
+// ── Reachability slices (S4, Stage-15) ─────────────────────────────────────
+
+export const SliceSchema = z.object({
+  /** Entry file (declares one or more routes/batch entries). */
+  root: z.string(),
+  /** route/batch natural keys declared by this file, sorted. */
+  entryIds: z.array(z.string()),
+  /** Files reachable from root via edges (root included), sorted. */
+  reached: z.array(z.string()),
+});
+export type Slice = z.infer<typeof SliceSchema>;
+
+export const FileOwnershipSchema = z.object({
+  relPath: z.string(),
+  /** sole=단독 도달(그 도메인 후보) / shared=다중 도달(common 격리 후보) / unreached=미해소 큐 */
+  status: z.enum(["sole", "shared", "unreached"]),
+  /** Roots that reach this file, sorted. */
+  owners: z.array(z.string()),
+});
+export type FileOwnership = z.infer<typeof FileOwnershipSchema>;
+
+export const SlicesReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  gitCommit: z.string().nullable(),
+  depthCap: z.number().int().positive(),
+  slices: z.array(SliceSchema),
+  ownership: z.array(FileOwnershipSchema),
+});
+export type SlicesReport = z.infer<typeof SlicesReportSchema>;
 
 export const RoutesReportSchema = z.object({
   schemaVersion: z.literal(1),

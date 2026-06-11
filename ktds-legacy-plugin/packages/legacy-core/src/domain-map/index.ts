@@ -1,5 +1,6 @@
-// /understand-map domain-map module (ADR-001). Stage-14 surface:
-// S1 full census + S2 route/entry-point extraction, persisted to .spec/map/.
+// /understand-map domain-map module (ADR-001). Stage-14/15 surface:
+// S1 full census + S2 route/entry-point extraction + S3 call-chain edges +
+// S4 reachability slices, persisted to .spec/map/.
 export * from "./types.js";
 export {
   buildCensus,
@@ -22,7 +23,22 @@ export {
   writeMapArtifact,
   writeCensus,
   writeRoutes,
+  writeEdges,
+  writeSlices,
 } from "./persist.js";
-export { extractRoutes, scanDomainMap, gitCommitHash } from "./extract.js";
+export {
+  extractRoutes,
+  extractEdges,
+  parseJavaFacts,
+  scanDomainMap,
+  gitCommitHash,
+} from "./extract.js";
+export {
+  buildClassIndex,
+  buildMapperNamespaceIndex,
+  collectEdges,
+  resolveTypeRef,
+} from "./edges.js";
+export { buildSlices, DEFAULT_DEPTH_CAP } from "./slices.js";
 export { nameBasedBinding } from "./routes/stripes.js";
 export { classifyNextJsFile } from "./routes/nextjs.js";

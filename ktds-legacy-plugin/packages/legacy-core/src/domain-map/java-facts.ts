@@ -36,21 +36,59 @@ export interface JavaMethodFacts {
   annotations: JavaAnnotation[];
   /** Method body source — only ever regex-tested (api/form signals), never parsed. */
   bodyText: string;
+  /** 1-based line where the body block starts (anchors bodyText regex hits to file lines). */
+  bodyLine: number | null;
+}
+
+export interface JavaImport {
+  /** Dotted path as written, without "import"/"static"/";"/".*". */
+  path: string;
+  wildcard: boolean;
+  isStatic: boolean;
+  line: number;
+}
+
+export interface JavaFieldFacts {
+  name: string;
+  /** Declared type, generics stripped: "List<Order> orders" → "List". */
+  typeName: string;
+  /**
+   * Type identifiers inside the generic arguments: "Map<String, Order>" →
+   * ["String", "Order"]. Collection-typed fields are how legacy domain models
+   * hold each other — dropping the element type severs those chains.
+   */
+  typeArgNames: string[];
+  line: number;
+  /** @Autowired/@Resource/@Inject present (Stage-15 injection signal). */
+  injected: boolean;
 }
 
 export interface JavaClassFacts {
   name: string;
+  /**
+   * Dot-joined nesting chain: "Outer.Inner" for nested types, == name for
+   * top-level. Keeps the FQN index collision-free when a nested type shares
+   * its simple name with a sibling top-level type (review finding).
+   */
+  qualifiedName: string;
   line: number;
-  kind: "class" | "interface" | "annotation";
+  kind: "class" | "interface" | "annotation" | "enum";
   isAbstract: boolean;
   annotations: JavaAnnotation[];
   superclass: string | null;
-  interfaces: string[];
+  /** 1-based line of the extends clause (precise evidence anchor). */
+  superclassLine: number | null;
+  interfaces: Array<{ name: string; line: number }>;
   methods: JavaMethodFacts[];
+  /** Declared instance fields (Stage-15 call-chain signals). */
+  fields: JavaFieldFacts[];
+  /** Constructor parameter types, generics stripped (constructor injection). */
+  ctorParamTypes: Array<{ typeName: string; line: number }>;
 }
 
 export interface JavaFileFacts {
   packageName: string | null;
+  imports: JavaImport[];
   /** All classes including nested, in source order. */
   classes: JavaClassFacts[];
   /**
@@ -64,6 +102,7 @@ export async function scanJavaFile(source: string): Promise<JavaFileFacts> {
   return withJavaTree(source, (root) => {
     const facts: JavaFileFacts = {
       packageName: extractPackage(root),
+      imports: extractImports(root),
       classes: [],
       constants: new Map(),
     };
@@ -72,31 +111,50 @@ export async function scanJavaFile(source: string): Promise<JavaFileFacts> {
   });
 }
 
+function extractImports(root: JavaNode): JavaImport[] {
+  const out: JavaImport[] = [];
+  for (const decl of childrenOfType(root, "import_declaration")) {
+    const id =
+      firstChildOfType(decl, "scoped_identifier") ??
+      firstChildOfType(decl, "identifier");
+    if (!id) continue;
+    out.push({
+      path: id.text,
+      wildcard: decl.text.includes(".*"),
+      isStatic: /\bimport\s+static\b/.test(decl.text),
+      line: lineOf(decl),
+    });
+  }
+  return out;
+}
+
 // ── Type declarations ──────────────────────────────────────────────────────
 
-// Enum bodies (enum_body_declarations) are intentionally not descended into —
-// controllers are never enums; enum-hosted constants surface as
-// "unresolved-constant" notes rather than silent drops.
+// Enums ARE indexed as types (Stage-15: domain enums are legitimate edge
+// targets), but their bodies (enum_body) hold constants/methods in shapes the
+// member loop doesn't walk — controllers are never enums; enum-hosted
+// constants still surface as "unresolved-constant" notes rather than silent drops.
 const TYPE_DECL_KINDS: Record<string, JavaClassFacts["kind"]> = {
   class_declaration: "class",
   interface_declaration: "interface",
   annotation_type_declaration: "annotation",
   record_declaration: "class",
+  enum_declaration: "enum",
 };
 
-function collectTypes(node: JavaNode, facts: JavaFileFacts): void {
+function collectTypes(node: JavaNode, facts: JavaFileFacts, prefix = ""): void {
   for (let i = 0; i < node.namedChildCount; i++) {
     const child = node.namedChild(i);
     if (!child) continue;
     const kind = TYPE_DECL_KINDS[child.type];
     if (kind) {
-      const cls = extractClass(child, kind, facts);
+      const cls = extractClass(child, kind, facts, prefix);
       if (cls) facts.classes.push(cls);
-      // Recurse into the body for nested types.
+      // Recurse into the body for nested types, extending the nesting chain.
       const body = child.childForFieldName("body");
-      if (body) collectTypes(body, facts);
+      if (body) collectTypes(body, facts, cls?.qualifiedName ?? prefix);
     } else if (child.type === "program") {
-      collectTypes(child, facts);
+      collectTypes(child, facts, prefix);
     }
   }
 }
@@ -105,21 +163,27 @@ function extractClass(
   node: JavaNode,
   kind: JavaClassFacts["kind"],
   facts: JavaFileFacts,
+  prefix: string,
 ): JavaClassFacts | null {
   const nameNode = node.childForFieldName("name");
   if (!nameNode) return null;
   const className = nameNode.text;
   const modifiers = firstChildOfType(node, "modifiers");
+  const superclass = extractSuperclass(node);
 
   const cls: JavaClassFacts = {
     name: className,
+    qualifiedName: prefix ? `${prefix}.${className}` : className,
     line: lineOf(node),
     kind,
     isAbstract: modifiers?.text.includes("abstract") ?? false,
     annotations: modifiers ? extractAnnotations(modifiers) : [],
-    superclass: extractSuperclass(node),
+    superclass: superclass?.name ?? null,
+    superclassLine: superclass?.line ?? null,
     interfaces: extractInterfaces(node),
     methods: [],
+    fields: [],
+    ctorParamTypes: [],
   };
 
   const body = node.childForFieldName("body");
@@ -134,6 +198,11 @@ function extractClass(
         member.type === "constant_declaration"
       ) {
         collectConstants(member, className, facts.constants);
+        if (member.type === "field_declaration") {
+          collectFields(member, cls.fields);
+        }
+      } else if (member.type === "constructor_declaration") {
+        collectCtorParams(member, cls.ctorParamTypes);
       }
     }
   }
@@ -141,28 +210,105 @@ function extractClass(
   return cls;
 }
 
-function extractSuperclass(node: JavaNode): string | null {
+const INJECTION_ANNOTATIONS = new Set(["Autowired", "Resource", "Inject"]);
+
+function collectFields(node: JavaNode, into: JavaFieldFacts[]): void {
+  const typeNode = node.childForFieldName("type");
+  if (!typeNode) return;
+  const typeName = stripGenerics(typeNode.text);
+  const modifiers = firstChildOfType(node, "modifiers");
+  // Static fields are constants/state, not collaborator wiring.
+  if (modifiers && /\bstatic\b/.test(modifiers.text)) return;
+  const injected = modifiers
+    ? extractAnnotations(modifiers).some((a) => INJECTION_ANNOTATIONS.has(a.name))
+    : false;
+  const typeArgNames = genericArgNames(typeNode.text);
+  for (const declarator of childrenOfType(node, "variable_declarator")) {
+    const name = declarator.childForFieldName("name")?.text;
+    if (!name) continue;
+    into.push({ name, typeName, typeArgNames, line: lineOf(node), injected });
+  }
+}
+
+function collectCtorParams(
+  node: JavaNode,
+  into: Array<{ typeName: string; line: number }>,
+): void {
+  const params = node.childForFieldName("parameters");
+  if (!params) return;
+  for (let i = 0; i < params.namedChildCount; i++) {
+    const param = params.namedChild(i);
+    if (!param) continue;
+    let typeNode: JavaNode | null = null;
+    if (param.type === "formal_parameter") {
+      typeNode = param.childForFieldName("type");
+    } else if (param.type === "spread_parameter") {
+      // Varargs (Handler... handlers) has no `type` field in the grammar —
+      // the type is the named child that is neither modifiers nor declarator
+      // (review finding: dropping it severed ctor-injection signals).
+      for (let j = 0; j < param.namedChildCount; j++) {
+        const c = param.namedChild(j);
+        if (c && c.type !== "modifiers" && c.type !== "variable_declarator") {
+          typeNode = c;
+          break;
+        }
+      }
+    }
+    if (!typeNode) continue;
+    const line = lineOf(param);
+    into.push({ typeName: stripGenerics(typeNode.text), line });
+    // Generic arguments are signals too: Service(List<Handler> handlers).
+    for (const arg of genericArgNames(typeNode.text)) {
+      into.push({ typeName: arg, line });
+    }
+  }
+}
+
+/** Keywords/wildcards that can appear inside generic argument lists. */
+const GENERIC_NOISE = new Set(["extends", "super"]);
+
+/**
+ * All type identifiers inside the generic argument list, nested generics
+ * flattened: "Map<String, List<Order>>" → ["String", "List", "Order"].
+ * Resolution downstream discards JDK names as external — better to over-list
+ * here than to sever a domain chain.
+ */
+function genericArgNames(typeText: string): string[] {
+  const open = typeText.indexOf("<");
+  const close = typeText.lastIndexOf(">");
+  if (open === -1 || close <= open) return [];
+  const inner = typeText.slice(open + 1, close);
+  const out: string[] = [];
+  for (const m of inner.matchAll(/[A-Za-z_$][\w$.]*/g)) {
+    if (!GENERIC_NOISE.has(m[0])) out.push(m[0]);
+  }
+  return out;
+}
+
+function extractSuperclass(node: JavaNode): { name: string; line: number } | null {
   const sc = node.childForFieldName("superclass");
   if (!sc) return null;
   // superclass node is "extends X" — take the trailing type text.
-  return sc.text.replace(/^extends\s+/, "").trim() || null;
+  const name = sc.text.replace(/^extends\s+/, "").trim();
+  return name ? { name, line: lineOf(sc) } : null;
 }
 
-function extractInterfaces(node: JavaNode): string[] {
+function extractInterfaces(node: JavaNode): Array<{ name: string; line: number }> {
   const ifaces = node.childForFieldName("interfaces");
   if (!ifaces) return [];
   const list = firstChildOfType(ifaces, "type_list");
   if (!list) return [];
-  const out: string[] = [];
+  const out: Array<{ name: string; line: number }> = [];
   for (let i = 0; i < list.namedChildCount; i++) {
     const t = list.namedChild(i);
-    if (t) out.push(stripGenerics(t.text));
+    if (t) out.push({ name: stripGenerics(t.text), line: lineOf(t) });
   }
   return out;
 }
 
 function extractMethod(node: JavaNode): JavaMethodFacts {
   const modifiers = firstChildOfType(node, "modifiers");
+  const body = node.childForFieldName("body");
   return {
     name: node.childForFieldName("name")?.text ?? "",
     line: lineOf(node),
@@ -170,7 +316,8 @@ function extractMethod(node: JavaNode): JavaMethodFacts {
     paramsText: node.childForFieldName("parameters")?.text ?? "()",
     returnType: node.childForFieldName("type")?.text ?? null,
     annotations: modifiers ? extractAnnotations(modifiers) : [],
-    bodyText: node.childForFieldName("body")?.text ?? "",
+    bodyText: body?.text ?? "",
+    bodyLine: body ? lineOf(body) : null,
   };
 }
 

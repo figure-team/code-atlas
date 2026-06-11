@@ -7,7 +7,12 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 import { scanDomainMap } from "./extract.js";
-import { CensusReportSchema, RoutesReportSchema } from "./types.js";
+import {
+  CensusReportSchema,
+  EdgesReportSchema,
+  RoutesReportSchema,
+  SlicesReportSchema,
+} from "./types.js";
 
 // M1 (A11 확장): 동일 입력 2회 실행 → .spec/map/ 산출물 byte-diff=0.
 // 직렬화 자체가 결정론 경계이므로 구조 비교가 아니라 바이트 비교여야 한다.
@@ -27,23 +32,31 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-test("scanDomainMap 2회 실행 → census.json/routes.json byte-diff=0", async () => {
+test("scanDomainMap 2회 실행 → census/routes/edges/slices byte-diff=0", async () => {
   await cp(join(FIXTURES, "spring-basic"), dir, { recursive: true });
 
   await scanDomainMap(dir);
   const census1 = await readFile(join(dir, ".spec/map/census.json"), "utf-8");
   const routes1 = await readFile(join(dir, ".spec/map/routes.json"), "utf-8");
+  const edges1 = await readFile(join(dir, ".spec/map/edges.json"), "utf-8");
+  const slices1 = await readFile(join(dir, ".spec/map/slices.json"), "utf-8");
 
   await scanDomainMap(dir);
   const census2 = await readFile(join(dir, ".spec/map/census.json"), "utf-8");
   const routes2 = await readFile(join(dir, ".spec/map/routes.json"), "utf-8");
+  const edges2 = await readFile(join(dir, ".spec/map/edges.json"), "utf-8");
+  const slices2 = await readFile(join(dir, ".spec/map/slices.json"), "utf-8");
 
   expect(census2).toBe(census1);
   expect(routes2).toBe(routes1);
+  expect(edges2).toBe(edges1);
+  expect(slices2).toBe(slices1);
 
   // 산출물은 스키마에 적합해야 한다 (14.1 DoD)
   expect(() => CensusReportSchema.parse(JSON.parse(census1))).not.toThrow();
   expect(() => RoutesReportSchema.parse(JSON.parse(routes1))).not.toThrow();
+  expect(() => EdgesReportSchema.parse(JSON.parse(edges1))).not.toThrow();
+  expect(() => SlicesReportSchema.parse(JSON.parse(slices1))).not.toThrow();
 });
 
 test("git 모드: 2회 실행 byte-diff=0 + gitCommit 40-hex (리뷰 반영 — 실전 주 경로)", async () => {
@@ -75,7 +88,7 @@ test("git 모드: 2회 실행 byte-diff=0 + gitCommit 40-hex (리뷰 반영 — 
 
 test("산출물에 타임스탬프성 필드가 없다 (재실행 diff=0의 전제)", async () => {
   await cp(join(FIXTURES, "stripes-app"), dir, { recursive: true });
-  const { census, routes } = await scanDomainMap(dir);
-  const serialized = JSON.stringify({ census, routes });
+  const { census, routes, edges, slices } = await scanDomainMap(dir);
+  const serialized = JSON.stringify({ census, routes, edges, slices });
   expect(serialized).not.toMatch(/scannedAt|analyzedAt|timestamp|generatedAt/i);
 });
