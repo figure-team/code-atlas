@@ -1,0 +1,13 @@
+{
+  "description": "배치 엔트리 기대 명세표 (14.4) — @Scheduled(cron), public static void main, Quartz CronTriggerFactoryBean(JobDetail 빈은 중복 방지로 제외), <task:scheduled>",
+  "routes": [],
+  "batchEntries": [
+    { "trigger": "main", "schedule": null, "handler": "ImportCli#main", "filePath": "src/main/java/com/acme/batch/ImportCli.java" },
+    { "trigger": "scheduled", "schedule": "cron=0 0 4 * * ?", "handler": "ReportJob#nightly", "filePath": "src/main/java/com/acme/batch/ReportJob.java" },
+    { "trigger": "scheduled", "schedule": "cron=0 0 6 * * MON", "handler": "ReportJob#weekly", "filePath": "src/main/java/com/acme/batch/ReportJob.java" },
+    { "trigger": "scheduled", "schedule": "cron=0 0 18 * * FRI", "handler": "ReportJob#weekly", "filePath": "src/main/java/com/acme/batch/ReportJob.java" },
+    { "trigger": "quartz", "schedule": "cron=0 30 2 * * ?", "handler": "reportJobDetail", "filePath": "src/main/resources/quartz-context.xml" },
+    { "trigger": "quartz", "schedule": "cron=0 15 3 * * ?", "handler": "nestedJobDetail", "filePath": "src/main/resources/quartz-scheduler.xml" },
+    { "trigger": "task-xml", "schedule": "cron=0 0 1 * * ?", "handler": "cleanupJob#run", "filePath": "src/main/resources/quartz-context.xml" }
+  ]
+}

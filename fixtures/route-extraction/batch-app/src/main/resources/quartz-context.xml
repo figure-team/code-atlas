@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:task="http://www.springframework.org/schema/task">
+
+  <bean id="reportJobDetail" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+    <property name="targetObject" ref="reportJob"/>
+    <property name="targetMethod" value="nightly"/>
+  </bean>
+
+  <bean id="reportTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+    <property name="jobDetail" ref="reportJobDetail"/>
+    <property name="cronExpression" value="0 30 2 * * ?"/>
+  </bean>
+
+  <task:scheduled-tasks scheduler="appScheduler">
+    <task:scheduled ref="cleanupJob" method="run" cron="0 0 1 * * ?"/>
+  </task:scheduled-tasks>
+
+</beans>

@@ -1,0 +1,13 @@
+{
+  "description": "web.xml + JSP 기대 명세표 (14.4) — servlet-mapping 전수(다중 url-pattern, jsp-file 서블릿, 확장자 매핑 verbatim, dispatcher 플래그), webapp 루트 기준 JSP 직접 엔드포인트, WEB-INF 제외",
+  "routes": [
+    { "method": "ANY", "path": "*.do", "kind": "servlet", "framework": "webxml", "handler": "org.springframework.web.servlet.DispatcherServlet", "notes": ["dispatcher"] },
+    { "method": "ANY", "path": "/biz/*", "kind": "servlet", "framework": "webxml", "handler": "com.acme.legacy.BizServlet", "notes": [] },
+    { "method": "ANY", "path": "/cdata/*", "kind": "servlet", "framework": "webxml", "handler": "com.acme.legacy.BizServlet", "notes": [] },
+    { "method": "ANY", "path": "/legacy/report", "kind": "servlet", "framework": "webxml", "handler": "com.acme.legacy.ReportServlet", "notes": [] },
+    { "method": "ANY", "path": "/notice", "kind": "servlet", "framework": "webxml", "handler": "/WEB-INF/jsp/notice.jsp", "notes": [] },
+    { "method": "GET", "path": "/order/list.jsp", "kind": "page", "framework": "jsp", "handler": null, "notes": [] },
+    { "method": "ANY", "path": "/reports/*", "kind": "servlet", "framework": "webxml", "handler": "com.acme.legacy.ReportServlet", "notes": [] }
+  ],
+  "batchEntries": []
+}

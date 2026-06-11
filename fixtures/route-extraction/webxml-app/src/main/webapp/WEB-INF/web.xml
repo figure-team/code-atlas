@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app>
+
+  <servlet>
+    <servlet-name>reportServlet</servlet-name>
+    <servlet-class>com.acme.legacy.ReportServlet</servlet-class>
+  </servlet>
+
+  <servlet>
+    <servlet-name>noticePage</servlet-name>
+    <jsp-file>/WEB-INF/jsp/notice.jsp</jsp-file>
+  </servlet>
+
+  <servlet>
+    <servlet-name>springDispatcher</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+  </servlet>
+
+  <servlet id="s2">
+    <servlet-name>bizServlet</servlet-name>
+    <servlet-class>com.acme.legacy.BizServlet</servlet-class>
+  </servlet>
+
+  <servlet-mapping>
+    <servlet-name>reportServlet</servlet-name>
+    <url-pattern>/reports/*</url-pattern>
+    <url-pattern>/legacy/report</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>noticePage</servlet-name>
+    <url-pattern>/notice</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>springDispatcher</servlet-name>
+    <url-pattern>*.do</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping id="m1">
+    <servlet-name>bizServlet</servlet-name>
+    <url-pattern>/biz/*</url-pattern>
+    <url-pattern><![CDATA[/cdata/*]]></url-pattern>
+  </servlet-mapping>
+
+  <!--
+  <servlet-mapping>
+    <servlet-name>oldServlet</servlet-name>
+    <url-pattern>/old/*</url-pattern>
+  </servlet-mapping>
+  -->
+
+</web-app>

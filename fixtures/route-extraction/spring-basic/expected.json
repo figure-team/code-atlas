@@ -1,0 +1,22 @@
+{
+  "description": "Spring 라우트 추출 기대 명세표 (14.4) — 속성형 method=, 다중 path/method, 클래스+메서드 결합, 상수 해소(파일내/교차파일), composed 메타어노테이션(매핑+스테레오타입), 미해소 상수 보고, /* 와일드카드 제거, ResponseEntity·@ResponseBody api 판별",
+  "routes": [
+    { "method": "POST", "path": "/admin/save", "kind": "form", "framework": "spring", "handler": "AdminController#save", "notes": [] },
+    { "method": "GET", "path": "/api/v1/users", "kind": "api", "framework": "spring", "handler": "UserApiController#listUsers", "notes": ["constant:ApiConstants.BASE"] },
+    { "method": "GET", "path": "/api/v1/users/active", "kind": "api", "framework": "spring", "handler": "UserApiController#activeUsers", "notes": ["constant:ApiConstants.BASE"] },
+    { "method": "GET", "path": "/api/v1/users/export", "kind": "api", "framework": "spring", "handler": "UserApiController#exportUsers", "notes": ["constant:ApiConstants.BASE"] },
+    { "method": "GET", "path": "/api/v1/users/report/pdf", "kind": "api", "framework": "spring", "handler": "UserApiController#reportPdf", "notes": ["constant:ApiConstants.BASE", "constant:REPORT_BASE + \"/pdf\""] },
+    { "method": "GET", "path": "/api/v1/users/{id}", "kind": "api", "framework": "spring", "handler": "UserApiController#getUser", "notes": ["constant:ApiConstants.BASE", "constant:DETAIL"] },
+    { "method": "GET", "path": "/orders/detail", "kind": "form", "framework": "spring", "handler": "OrderController#detail", "notes": [] },
+    { "method": "GET", "path": "/orders/export", "kind": "api", "framework": "spring", "handler": "OrderController#export", "notes": [] },
+    { "method": "GET", "path": "/orders/history", "kind": "form", "framework": "spring", "handler": "OrderController#history", "notes": ["also-declared-as:/orders/history/"] },
+    { "method": "GET", "path": "/orders/list", "kind": "form", "framework": "spring", "handler": "OrderController#list", "notes": [] },
+    { "method": "POST", "path": "/orders/save", "kind": "form", "framework": "spring", "handler": "OrderController#save", "notes": [] },
+    { "method": "GET", "path": "/orders/show", "kind": "form", "framework": "spring", "handler": "OrderController#detail", "notes": [] },
+    { "method": "GET", "path": "/orders/sync", "kind": "api", "framework": "spring", "handler": "OrderController#sync", "notes": [] },
+    { "method": "POST", "path": "/orders/sync", "kind": "api", "framework": "spring", "handler": "OrderController#sync", "notes": [] },
+    { "method": "POST", "path": "/partners/pay", "kind": "form", "framework": "spring", "handler": "PartnerController#pay", "notes": ["composed:@ApiMapping", "composed:@WebController"] },
+    { "method": "POST", "path": "/__unresolved__/ExternalConstants.CALLBACK", "kind": "form", "framework": "spring", "handler": "PartnerController#callback", "notes": ["composed:@ApiMapping", "composed:@WebController", "unresolved-constant:ExternalConstants.CALLBACK"] }
+  ],
+  "batchEntries": []
+}

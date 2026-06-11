@@ -1,0 +1,14 @@
+{
+  "description": "Next.js 파일 라우팅 기대 명세표 (14.4 — 2스택 대비 M5): App Router(라우트그룹 제거, [id]→{id}, route.ts METHOD export별 라우트), Pages Router(index 축약, api/ 판별, _app 제외)",
+  "routes": [
+    { "method": "GET", "path": "/", "kind": "page", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "GET", "path": "/about", "kind": "page", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "GET", "path": "/app/dashboard", "kind": "page", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "GET", "path": "/login", "kind": "page", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "DELETE", "path": "/api/items/{id}", "kind": "api", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "GET", "path": "/api/items/{id}", "kind": "api", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "ANY", "path": "/api/orders", "kind": "api", "framework": "nextjs", "handler": null, "notes": [] },
+    { "method": "GET", "path": "/products/{slug}", "kind": "page", "framework": "nextjs", "handler": null, "notes": [] }
+  ],
+  "batchEntries": []
+}

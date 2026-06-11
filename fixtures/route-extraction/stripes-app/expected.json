@@ -1,0 +1,9 @@
+{
+  "description": "Stripes 기대 명세표 (14.4 — jpetstore Stripes 케이스 자체 작성): @UrlBinding 명시 + NameBasedActionResolver 이름규약(base package 뒤 세그먼트 + 클래스명 suffix 제거 + .action), abstract 베이스 제외",
+  "routes": [
+    { "method": "ANY", "path": "/actions/Catalog.action", "kind": "form", "framework": "stripes", "handler": "CatalogActionBean", "notes": ["name-based-convention"] },
+    { "method": "ANY", "path": "/actions/Checkout.action", "kind": "form", "framework": "stripes", "handler": "CheckoutBean", "notes": ["name-based-convention"] },
+    { "method": "ANY", "path": "/shop/cart.action", "kind": "form", "framework": "stripes", "handler": "CartActionBean", "notes": [] }
+  ],
+  "batchEntries": []
+}
