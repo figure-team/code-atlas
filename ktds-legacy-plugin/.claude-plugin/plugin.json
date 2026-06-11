@@ -1,7 +1,7 @@
 {
   "name": "ktds-legacy",
   "description": "Legacy AI 문서 자동화 — U-A 지식 그래프 기반 근거 문서 5종 생성 + 검토/승인/감사 (비민감 샘플 전용, 보안 게이트는 Phase 2)",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": {
     "name": "ktds"
   },

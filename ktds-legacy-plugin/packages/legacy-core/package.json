@@ -1,6 +1,6 @@
 {
   "name": "@ktds/legacy-core",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "private": true,
   "description": "ktds Legacy 문서 자동화 공통 엔진 (kg-reader, evidence, doc-generator, ...). CLI 독립. U-A fork 내 격리 패키지.",
