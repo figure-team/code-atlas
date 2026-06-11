@@ -72,7 +72,7 @@ interface RawLayer {
   nodeIds?: string[];
 }
 
-interface RawGraph {
+export interface RawGraph {
   version: string;
   project?: RawProject;
   nodes: RawNode[];
@@ -281,6 +281,11 @@ export function parseRawGraph(raw: RawGraph, options: ReadOptions = {}): Canonic
         line: n.lineRange?.[0],
       };
     }
+    // domainMeta passthrough (Stage-18.1) — buildFeatureSpec이 entities/
+    // businessRules를 claim으로 렌더한다 (이전엔 여기서 유실됐다, 리뷰 B-1).
+    if (n.domainMeta !== undefined) {
+      node.domainMeta = n.domainMeta;
+    }
     return node;
   });
 
@@ -332,4 +337,97 @@ export function parseRawGraph(raw: RawGraph, options: ReadOptions = {}): Canonic
   }));
 
   return { sourceVersion: raw.version, fingerprint, project, layers, nodes, edges };
+}
+
+// ── domain-graph 병합 로더 (Stage-18.1, ADR D4) ───────────────────────────
+// /understand-map(또는 U-A /understand-domain)이 만든 domain-graph.json을
+// CanonicalGraph에 병합한다 — "하류 함수 무수정 + 로더 병합 1곳 추가".
+// domain-graph의 노드 id(domain:/flow:/step:)는 이미 자연키이므로(A15)
+// uid 재유도 없이 그대로 uid가 된다 — KG의 ordinal id와 충돌하지 않고,
+// 이름이 빈칸(미채움 skeleton)이어도 uid가 무너지지 않는다.
+
+/** domain-graph.json 읽기 — 부재 시 null (D5: /understand-map 미실행 허용). */
+export async function readDomainGraphFile(
+  domainGraphPath: string,
+): Promise<RawGraph | null> {
+  let rawText: string;
+  try {
+    rawText = await readFile(domainGraphPath, "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+  const raw = JSON.parse(rawText) as RawGraph;
+  if (!raw || !Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) {
+    throw new Error(
+      "[kg-reader] malformed domain-graph: expected { nodes: [], edges: [] }",
+    );
+  }
+  return raw;
+}
+
+/**
+ * domain-graph를 base CanonicalGraph에 병합한 새 그래프를 반환 (비파괴).
+ * uid 충돌(이미 같은 uid 존재)은 domain-graph 쪽을 건너뛰고 보고한다 —
+ * 같은 그래프를 두 번 병합해도 결과가 같다(멱등).
+ */
+export function mergeDomainGraph(
+  base: CanonicalGraph,
+  domainRaw: RawGraph,
+): { graph: CanonicalGraph; merged: number; skipped: string[] } {
+  const existing = new Set(base.nodes.map((n) => n.uid));
+  const skipped: string[] = [];
+  const addedNodes: CanonicalNode[] = [];
+  for (const n of domainRaw.nodes) {
+    if (existing.has(n.id)) {
+      skipped.push(n.id);
+      continue;
+    }
+    const node: CanonicalNode = {
+      uid: n.id,
+      kind: n.type as CanonicalKind,
+      name: n.name,
+      summary: n.summary ?? "",
+      tags: Array.isArray(n.tags) ? n.tags : [],
+    };
+    if (n.filePath !== undefined) {
+      node.evidence = { path: n.filePath, line: n.lineRange?.[0] };
+    }
+    if (n.domainMeta !== undefined) node.domainMeta = n.domainMeta;
+    addedNodes.push(node);
+    existing.add(n.id);
+  }
+  // 엣지는 양 끝이 알려져 있고 **최소 한쪽이 이번에 추가된 도메인 노드**일
+  // 때만 들인다 — base KG 노드끼리를 잇는 외부산 엣지가 조용히 붙는 것을
+  // 막는다(리뷰 반영; 현 emit은 도메인 노드 간 엣지만 만든다).
+  const known = existing;
+  const addedIds = new Set(addedNodes.map((n) => n.uid));
+  const addedEdges: CanonicalEdge[] = domainRaw.edges
+    .filter(
+      (e) =>
+        known.has(e.source) &&
+        known.has(e.target) &&
+        (addedIds.has(e.source) || addedIds.has(e.target)),
+    )
+    .map((e) => ({
+      sourceUid: e.source,
+      targetUid: e.target,
+      type: e.type,
+      direction: e.direction,
+      weight: e.weight,
+    }));
+  if (skipped.length > 0) {
+    console.warn(
+      `[kg-reader] domain-graph 병합: uid 충돌 ${skipped.length}건 건너뜀 (${skipped.slice(0, 3).join(", ")}…)`,
+    );
+  }
+  return {
+    graph: {
+      ...base,
+      nodes: [...base.nodes, ...addedNodes],
+      edges: [...base.edges, ...addedEdges],
+    },
+    merged: addedNodes.length,
+    skipped,
+  };
 }

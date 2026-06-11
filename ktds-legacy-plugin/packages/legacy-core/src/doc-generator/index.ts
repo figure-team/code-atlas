@@ -1,7 +1,8 @@
 import type {
-  CanonicalGraph, CanonicalNode, CanonicalEdge, Claim, DocSection, GeneratedDoc, ProjectMeta,
+  CanonicalGraph, CanonicalNode, CanonicalEdge, Claim, DocSection, Evidence, GeneratedDoc, ProjectMeta,
 } from "../types.js";
 import { CONFIDENCE_TAG, CLAIMS_FENCE_OPEN, CLAIMS_FENCE_CLOSE } from "../types.js";
+import { NEEDS_REVIEW_MARKER } from "../domain-map/emit.js";
 
 /**
  * doc-generator (plan §3.2 / §2.3): 5종 근거 문서 생성.
@@ -141,17 +142,94 @@ export function buildArchitecture(graph: CanonicalGraph): GeneratedDoc {
   };
 }
 
+// domainMeta의 항목(entities/businessRules/crossDomainInteractions)을 claim으로
+// 렌더 (Stage-18.1 — 이전엔 name/summary만 소비, 리뷰 B-1). 근거는 /understand-map이
+// domainMeta.ktdsClaims(passthrough)에 동봉한 파일:라인 인용에서 가져온다:
+//   인용 있음 → CONFIRMED_AI / 없음 → INFERRED /
+//   기계 검증 강등 마커("[확인 필요] " 접두) → NEEDS_REVIEW (마커는 떼고
+//   CONFIDENCE_TAG 렌더가 다시 붙인다 — 이중 표기 방지)
+function domainMetaClaims(n: CanonicalNode): Claim[] {
+  const meta = n.domainMeta;
+  if (!meta) return [];
+  // (kind, text) 복합 키 — 종류가 다른 항목이 같은 텍스트를 가져도 근거가
+  // 섞이지 않는다(리뷰 반영).
+  const evidenceByKey = new Map<string, Evidence[]>();
+  if (Array.isArray(meta.ktdsClaims)) {
+    for (const c of meta.ktdsClaims as Array<Record<string, unknown>>) {
+      if (typeof c?.text === "string" && typeof c?.kind === "string" && Array.isArray(c.citations)) {
+        const ev = (c.citations as Array<Record<string, unknown>>)
+          .filter((x) => typeof x?.filePath === "string")
+          .map((x) => ({ path: x.filePath as string, line: x.line as number | undefined }));
+        const key = `${c.kind} ${c.text}`;
+        if (ev.length > 0 && !evidenceByKey.has(key)) evidenceByKey.set(key, ev);
+      }
+    }
+  }
+  const out: Claim[] = [];
+  for (const [field, kind, label] of [
+    ["entities", "entity", "엔터티"],
+    ["businessRules", "businessRule", "업무 규칙"],
+    ["crossDomainInteractions", "crossDomain", "도메인 간 상호작용"],
+  ] as const) {
+    const items = meta[field];
+    if (!Array.isArray(items)) continue;
+    for (const raw of items) {
+      if (typeof raw !== "string" || raw.length === 0) continue;
+      const demoted = raw.startsWith(NEEDS_REVIEW_MARKER);
+      const text = demoted ? raw.slice(NEEDS_REVIEW_MARKER.length) : raw;
+      const evidence = evidenceByKey.get(`${kind} ${text}`) ?? [];
+      const claimText = `${n.name} ${label}: ${text}`;
+      if (demoted) {
+        out.push({ claim: claimText, confidence: "NEEDS_REVIEW", evidence, requires_human_review: true });
+      } else if (evidence.length > 0) {
+        out.push({ claim: claimText, confidence: "CONFIRMED_AI", evidence, requires_human_review: false });
+      } else {
+        out.push({ claim: claimText, confidence: "INFERRED", evidence: [], requires_human_review: true });
+      }
+    }
+  }
+  return out;
+}
+
+/** domainMeta.ktdsClaims에서 summary 인용 → Evidence[] (없으면 []). */
+function summaryEvidence(n: CanonicalNode): Evidence[] {
+  const claims = n.domainMeta?.ktdsClaims;
+  if (!Array.isArray(claims)) return [];
+  for (const c of claims as Array<Record<string, unknown>>) {
+    if (c?.kind === "summary" && Array.isArray(c.citations)) {
+      return (c.citations as Array<Record<string, unknown>>)
+        .filter((x) => typeof x?.filePath === "string")
+        .map((x) => ({ path: x.filePath as string, line: x.line as number | undefined }));
+    }
+  }
+  return [];
+}
+
 export function buildFeatureSpec(graph: CanonicalGraph): GeneratedDoc {
-  const domains = nodesOfKind(graph, "domain").map((n) => claimForNode(n, `업무 도메인: ${n.name} — ${n.summary}`));
+  const domainNodes = nodesOfKind(graph, "domain");
+  // 도메인은 단일 파일 증거가 없지만(여러 파일의 묶음), /understand-map의
+  // summary 인용(기계 검증 통과)이 있으면 그것이 근거다 — 없으면 INFERRED.
+  const domains = domainNodes.map((n) => {
+    const text = `업무 도메인: ${n.name} — ${n.summary}`;
+    if (!n.evidence?.path) {
+      const ev = summaryEvidence(n);
+      if (ev.length > 0) {
+        return { claim: text, confidence: "CONFIRMED_AI" as const, evidence: ev, requires_human_review: false };
+      }
+    }
+    return claimForNode(n, text);
+  });
   const flows = nodesOfKind(graph, "flow").map((n) => claimForNode(n, `흐름: ${n.name} — ${n.summary}`));
   // §2.3 step 노드: 코드 진입점 근거(file:line)를 살려 CONFIRMED_AI 로 렌더.
   // (contains_flow/flow_step 엣지로 표현되는 흐름-단계 포함관계의 단계 엔티티 자체)
   const stepNodes = nodesOfKind(graph, "step").map((n) => claimForNode(n, `처리 단계: ${n.name} — ${n.summary}`));
+  const metaClaims = domainNodes.flatMap(domainMetaClaims);
   return {
     filename: "03_feature-spec.md",
     title: "기능 명세",
     sections: [
       { heading: "업무 도메인", claims: domains },
+      { heading: "엔터티 · 업무 규칙", claims: metaClaims },
       { heading: "처리 흐름", claims: flows },
       { heading: "처리 단계", claims: stepNodes },
     ],

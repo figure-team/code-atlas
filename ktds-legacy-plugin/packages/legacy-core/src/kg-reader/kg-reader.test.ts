@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { describe, it, expect, vi } from "vitest";
-import { readKnowledgeGraph, parseRawGraph, checkVersion, checkFingerprint, computeFingerprint } from "./index.js";
+import { readKnowledgeGraph, parseRawGraph, checkVersion, checkFingerprint, computeFingerprint, mergeDomainGraph } from "./index.js";
 
 const FIXTURE = resolve(
   import.meta.dirname,
@@ -263,5 +263,54 @@ describe("version guard consumes configurable supportedVersions (HIGH-3)", () =>
 
   it("checkVersion accepts a custom supported list", () => {
     expect(() => checkVersion("9.9.9", ["9.9.9"])).not.toThrow();
+  });
+});
+
+describe("domainMeta passthrough + domain-graph 병합 (Stage-18.1)", () => {
+  const rawNode = (id: string, type: string, extra: Record<string, unknown> = {}) => ({
+    id, type, name: id, summary: "s", tags: [], ...extra,
+  });
+
+  it("parseRawGraph가 domainMeta를 CanonicalNode로 보존한다 (리뷰 B-1)", () => {
+    const g = parseRawGraph({
+      version: "1.0.0",
+      nodes: [rawNode("d1", "domain", { domainMeta: { entities: ["Order"] } })],
+      edges: [],
+    } as never);
+    expect(g.nodes[0].domainMeta).toEqual({ entities: ["Order"] });
+  });
+
+  it("mergeDomainGraph: 자연키 id가 그대로 uid가 되고 엣지가 병합된다", () => {
+    const base = parseRawGraph({ version: "1.0.0", nodes: [rawNode("n_1", "file", { filePath: "A.java" })], edges: [] } as never);
+    const { graph, merged } = mergeDomainGraph(base, {
+      version: "1.0.0",
+      nodes: [
+        rawNode("domain:order", "domain", { domainMeta: { entities: [] } }),
+        rawNode("flow:POST /orders", "flow", { filePath: "A.java", lineRange: [7, 7] }),
+      ],
+      edges: [
+        { source: "domain:order", target: "flow:POST /orders", type: "contains_flow", direction: "forward", weight: 1 },
+      ],
+    });
+    expect(merged).toBe(2);
+    const flow = graph.nodes.find((n) => n.uid === "flow:POST /orders")!;
+    expect(flow.evidence).toEqual({ path: "A.java", line: 7 });
+    expect(graph.edges.some((e) => e.sourceUid === "domain:order" && e.type === "contains_flow")).toBe(true);
+    // base는 비파괴
+    expect(base.nodes).toHaveLength(1);
+  });
+
+  it("mergeDomainGraph 멱등: 같은 그래프 재병합 → 충돌 전부 건너뜀", () => {
+    const base = parseRawGraph({ version: "1.0.0", nodes: [], edges: [] } as never);
+    const domainRaw = {
+      version: "1.0.0",
+      nodes: [rawNode("domain:order", "domain")],
+      edges: [],
+    };
+    const once = mergeDomainGraph(base, domainRaw);
+    const twice = mergeDomainGraph(once.graph, domainRaw);
+    expect(twice.merged).toBe(0);
+    expect(twice.skipped).toEqual(["domain:order"]);
+    expect(twice.graph.nodes).toHaveLength(1);
   });
 });

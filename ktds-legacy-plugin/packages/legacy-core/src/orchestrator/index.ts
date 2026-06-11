@@ -1,7 +1,12 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { loadConfig } from "../config/index.js";
-import { readKnowledgeGraph } from "../kg-reader/index.js";
+import {
+  mergeDomainGraph,
+  readDomainGraphFile,
+  readKnowledgeGraph,
+} from "../kg-reader/index.js";
+import { kgFingerprint } from "../domain-map/extract.js";
 import { validateClaims, computeInferredRatio } from "../evidence/index.js";
 import { generateDocs, renderMarkdown, type ProseProvider } from "../doc-generator/index.js";
 import { acquireLock, releaseLock, withStaging, publishStaging } from "../lock/index.js";
@@ -49,9 +54,61 @@ export async function runDocsPipeline(
   if (lock.staleRemoved) await logEvent(specDir, "STALE_LOCK_REMOVED", { runId: options.runId });
 
   try {
-    const graph = await readKnowledgeGraph(graphPath, {
-      supportedVersions: config.supportedSchemaVersions,
-    });
+    // preflight: KG 부재는 ENOENT 그대로 죽는 대신 행동 가능한 안내로 (D4)
+    let graph;
+    try {
+      graph = await readKnowledgeGraph(graphPath, {
+        supportedVersions: config.supportedSchemaVersions,
+      });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new RunAbortedError(
+          "knowledge-graph.json 없음 — 먼저 /understand를 실행하세요",
+        );
+      }
+      throw err;
+    }
+
+    // domain-graph 병합 스텝 (Stage-18.1, ADR D4 — ktds 측 수정 1곳).
+    // /understand-map(자체) 또는 U-A /understand-domain 산출물 모두 수용.
+    const domainRaw = await readDomainGraphFile(
+      join(projectRoot, ".understand-anything", "domain-graph.json"),
+    );
+    if (domainRaw) {
+      // freshness 경고 (18.2): /understand-map emit 시점에 기록한 KG
+      // fingerprint·commit이 현재와 다르면 도메인 분석이 낡았다 — 차단은
+      // 아니고(문서 4종은 유효) 재실행 안내만.
+      const ktdsMap = (domainRaw as { ktdsMap?: Record<string, unknown> }).ktdsMap;
+      if (ktdsMap) {
+        const currentKg = await kgFingerprint(projectRoot);
+        if (
+          typeof ktdsMap.kgFingerprintAtEmit === "string" &&
+          currentKg !== null &&
+          ktdsMap.kgFingerprintAtEmit !== currentKg
+        ) {
+          console.warn(
+            "[understand-docs] 도메인 분석이 knowledge-graph보다 오래됨 — /understand-map emit 재실행을 권장합니다.",
+          );
+        }
+        if (
+          typeof ktdsMap.generatedFromCommit === "string" &&
+          graph.project.gitCommitHash &&
+          ktdsMap.generatedFromCommit !== graph.project.gitCommitHash
+        ) {
+          console.warn(
+            `[understand-docs] domain-graph 생성 commit(${String(ktdsMap.generatedFromCommit).slice(0, 8)})이 KG commit(${graph.project.gitCommitHash.slice(0, 8)})과 다릅니다.`,
+          );
+        }
+      }
+      graph = mergeDomainGraph(graph, domainRaw).graph;
+    }
+    // preflight: domain 노드 부재 → 03_feature-spec이 비는 갭(step6 실측)을
+    // 조용히 지나치지 않고 안내한다 (차단은 아님 — 4종 문서는 유효)
+    if (!graph.nodes.some((n) => n.kind === "domain")) {
+      console.warn(
+        "[understand-docs] domain 노드 없음 — 03_feature-spec이 비게 됩니다. /understand-map(권장) 또는 /understand-domain을 먼저 실행하세요.",
+      );
+    }
     // LLM_REQUEST: 실제 LLM(prose) 사용 시에만 기록 (skeleton-only 실행은 LLM 호출 없음)
     if (options.prose) {
       await logEvent(specDir, "LLM_REQUEST", {

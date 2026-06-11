@@ -204,3 +204,56 @@ describe("detectCycles — no false positives", () => {
     expect(detectCycles(g)).toEqual([]);
   });
 });
+
+describe("domainMeta 렌더 (Stage-18.1 — 리뷰 B-1 해소)", () => {
+  const meta = {
+    entities: ["Order", "LineItem"],
+    businessRules: ["주문 ID는 시퀀스에서 채번", "[확인 필요] VIP는 무료배송"],
+    crossDomainInteractions: ["결제 도메인에 승인 요청"],
+    ktdsClaims: [
+      {
+        kind: "businessRule",
+        text: "주문 ID는 시퀀스에서 채번",
+        citations: [{ filePath: "OrderService.java", line: 61, snippet: "getNextId" }],
+      },
+      {
+        kind: "entity",
+        text: "Order",
+        citations: [{ filePath: "Order.java", line: 1, snippet: "class Order" }],
+      },
+    ],
+  };
+
+  it("entities/businessRules/crossDomain이 '엔터티 · 업무 규칙' 섹션 claim으로 렌더된다", () => {
+    const g = graphOf([node("domain:order", "domain", { name: "주문", domainMeta: meta })]);
+    const sec = buildFeatureSpec(g).sections.find((s) => s.heading === "엔터티 · 업무 규칙")!;
+    expect(sec.claims).toHaveLength(5);
+    expect(sec.claims.some((c) => c.claim === "주문 엔터티: Order")).toBe(true);
+    expect(sec.claims.some((c) => c.claim === "주문 도메인 간 상호작용: 결제 도메인에 승인 요청")).toBe(true);
+  });
+
+  it("ktdsClaims 인용이 있으면 CONFIRMED_AI + evidence, 없으면 INFERRED", () => {
+    const g = graphOf([node("domain:order", "domain", { name: "주문", domainMeta: meta })]);
+    const sec = buildFeatureSpec(g).sections.find((s) => s.heading === "엔터티 · 업무 규칙")!;
+    const cited = sec.claims.find((c) => c.claim.includes("시퀀스에서 채번"))!;
+    expect(cited.confidence).toBe("CONFIRMED_AI");
+    expect(cited.evidence[0]).toEqual({ path: "OrderService.java", line: 61 });
+    const uncited = sec.claims.find((c) => c.claim.endsWith("엔터티: LineItem"))!;
+    expect(uncited.confidence).toBe("INFERRED");
+  });
+
+  it("기계 검증 강등 마커는 NEEDS_REVIEW로, 마커 이중 표기 없이 렌더된다", () => {
+    const g = graphOf([node("domain:order", "domain", { name: "주문", domainMeta: meta })]);
+    const sec = buildFeatureSpec(g).sections.find((s) => s.heading === "엔터티 · 업무 규칙")!;
+    const demoted = sec.claims.find((c) => c.claim.includes("VIP"))!;
+    expect(demoted.confidence).toBe("NEEDS_REVIEW");
+    expect(demoted.claim).toBe("주문 업무 규칙: VIP는 무료배송");
+    expect(demoted.requires_human_review).toBe(true);
+  });
+
+  it("domainMeta 없는 도메인은 메타 claim 0건 (기존 동작 보존)", () => {
+    const g = graphOf([node("domain:plain", "domain")]);
+    const sec = buildFeatureSpec(g).sections.find((s) => s.heading === "엔터티 · 업무 규칙")!;
+    expect(sec.claims).toHaveLength(0);
+  });
+});

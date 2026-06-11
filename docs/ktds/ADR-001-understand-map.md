@@ -1,6 +1,6 @@
 # ADR-001: /understand-map — 도메인/기능 분석의 자체 생산자 신설
 
-- 상태: **초안 (Proposed)**
+- 상태: **승인 (Accepted)** — Stage-14~18 구현 완료, M1~M7 전부 그린 (2026-06-11)
 - 작성일: 2026-06-11
 - 결정 범위: ktds-legacy-plugin (U-A fork 격리 확장)
 - 관련: `.omc/plans/mvp-legacy-ai-docs.md` (A1~A19), `docs/ktds/TROUBLESHOOTING.md:73`, `step-explanation/step6.md`·`step7.md`, 구현 계획 `.omc/plans/understand-map-tasks.md`

@@ -49,6 +49,9 @@ const STOP_TOKENS = new Set([
   "dto", "vo", "bo", "form", "view", "page", "config", "configuration",
   "factory", "builder", "provider", "resolver", "validator", "converter",
   "index", "main", "app", "common", "web",
+  // Next.js 파일 라우팅 관례 — 파일명은 역할이고 도메인은 디렉토리다
+  "route", "layout", "error", "loading", "template", "document",
+  "middleware", "slug", "id", "params",
 ]);
 
 // ── 16.1 디렉토리 분류기 ───────────────────────────────────────────────────
@@ -103,9 +106,10 @@ export function classifyByDirectory(relPaths: string[]): DirectoryClassification
     const segs = dirSegs[i];
     for (let d = depth; d < segs.length; d++) {
       const seg = segs[d];
-      // dot-디렉토리(.github/.mvn)·숫자 디렉토리는 인프라 — 도메인 토큰 불가
+      // dot-디렉토리(.github/.mvn)·숫자 디렉토리는 인프라 — 도메인 토큰 불가.
+      // Next.js 라우팅 장치도 건너뛴다: (group)/@slot/[dynamic]/_private.
       if (
-        seg.startsWith(".") ||
+        /^[.([@_]/.test(seg) ||
         /^\d+$/.test(seg) ||
         SKIP_SEGMENTS.has(seg) ||
         LAYER_SEGMENTS.has(seg)
@@ -117,17 +121,18 @@ export function classifyByDirectory(relPaths: string[]): DirectoryClassification
     }
   }
 
-  // 퇴화 감지 (16.1): 클러스터(크기 ≥2) <2 또는 최대 클러스터 >60% 집중
+  // 퇴화 감지 (16.1): 서로 다른 토큰 <2 (분리 불능) 또는 최대 클러스터가
+  // 전체의 >60% 집중. 클러스터 크기는 묻지 않는다 — 작은 프로젝트에선
+  // 크기 1 클러스터들도 유효한 분리다 (Next.js 픽스처 실측).
   const clusterSizes = new Map<string, number>();
   for (const token of tokenByFile.values()) {
     clusterSizes.set(token, (clusterSizes.get(token) ?? 0) + 1);
   }
-  const meaningful = [...clusterSizes.values()].filter((n) => n >= 2);
   let degenerate: DirectoryClassification["degenerate"] = null;
-  if (meaningful.length < 2) {
+  if (clusterSizes.size < 2) {
     degenerate = { reason: "too-few-clusters" };
   } else {
-    const top = Math.max(...meaningful);
+    const top = Math.max(...clusterSizes.values());
     if (top * 100 > relPaths.length * 60) {
       degenerate = { reason: "single-cluster-concentration" };
     }
@@ -145,7 +150,7 @@ export function tokenizeBasename(relPath: string): string[] {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .split(/[\s_\-.]+/)
-    .map((t) => t.toLowerCase())
+    .map((t) => t.toLowerCase().replace(/[[\]()@{}]/g, ""))
     .filter((t) => t.length > 0);
 }
 

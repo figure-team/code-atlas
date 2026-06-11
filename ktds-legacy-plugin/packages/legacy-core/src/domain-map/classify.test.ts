@@ -107,6 +107,24 @@ test("퇴화 감지: 단일 디렉토리 집중 → too-few-clusters", () => {
   expect(r.degenerate).not.toBe(null);
 });
 
+test("Next.js: 그룹/슬롯/동적 세그먼트는 스킵, 디렉토리가 도메인 토큰 (M5)", () => {
+  const files = [
+    "app/(marketing)/about/page.tsx",
+    "app/@modal/login/page.tsx",
+    "app/api/items/[id]/route.ts",
+    "pages/products/[slug].tsx",
+  ];
+  const r = classifyByDirectory(files);
+  expect(r.degenerate).toBe(null);
+  expect(r.tokenByFile.get(files[0])).toBe("about");
+  expect(r.tokenByFile.get(files[1])).toBe("login");
+  expect(r.tokenByFile.get(files[2])).toBe("items");
+  expect(r.tokenByFile.get(files[3])).toBe("products");
+  // 파일명 page/route/[slug]는 prefix 신호가 아니다
+  expect(prefixToken(files[0])).toBe(null);
+  expect(prefixToken(files[3])).toBe(null);
+});
+
 test("dot-디렉토리는 도메인 토큰이 될 수 없다", () => {
   const r = classifyByDirectory([
     ...NKSHOP,

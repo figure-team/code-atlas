@@ -171,15 +171,36 @@ export async function extractEdges(
 }
 
 /**
- * U-A KG의 sha256 fingerprint — domain-graph freshness 대조용 (S10/18.2).
- * KG 부재 시 null (D5: /understand와 순서 무관).
+ * U-A KG의 구조 fingerprint — domain-graph freshness 대조용 (S10/18.2).
+ * raw bytes가 아니라 **정규화 투영**(노드 id/type/filePath + 엣지 s/t/type,
+ * 정렬)을 해시한다 — KG는 analyzedAt·LLM 산문을 포함해 재실행마다 바이트가
+ * 변하므로, raw 해시는 코드 불변에도 경고를 오발해 신호를 죽인다(리뷰 반영).
+ * KG 부재·손상 시 null (D5: /understand와 순서 무관).
  */
 export async function kgFingerprint(projectRoot: string): Promise<string | null> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(
+    raw = await fs.readFile(
       path.join(projectRoot, ".understand-anything", "knowledge-graph.json"),
+      "utf-8",
     );
-    return createHash("sha256").update(raw).digest("hex");
+  } catch {
+    return null;
+  }
+  try {
+    const graph = JSON.parse(raw) as {
+      nodes?: Array<{ id?: string; type?: string; filePath?: string }>;
+      edges?: Array<{ source?: string; target?: string; type?: string }>;
+    };
+    const projection = {
+      nodes: (graph.nodes ?? [])
+        .map((n) => [n.id ?? "", n.type ?? "", n.filePath ?? ""])
+        .sort(),
+      edges: (graph.edges ?? [])
+        .map((e) => [e.source ?? "", e.target ?? "", e.type ?? ""])
+        .sort(),
+    };
+    return createHash("sha256").update(JSON.stringify(projection)).digest("hex");
   } catch {
     return null;
   }

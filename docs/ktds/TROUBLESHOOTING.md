@@ -70,7 +70,7 @@
 
 ## 5. 내보내기 / 빌드
 
-- **HTML이 비어 보임/항목 없음:** 해당 노드 타입이 그래프에 없을 수 있음(예: U-A `domain-analyzer` 미실행 시 feature-spec 비어 있음). U-A 분석 단계 보강.
+- **HTML이 비어 보임/항목 없음:** 해당 노드 타입이 그래프에 없을 수 있음. **feature-spec(03)이 비면 `/understand-map`을 실행**하라 — scan→✋경계 확정→bundle→LLM 채움→emit으로 `domain-graph.json`이 생성되고, `/understand-docs`가 자동 병합한다(미실행 시 생성 단계에서 안내 경고가 뜬다). domain-graph가 KG보다 오래되면 freshness 경고가 뜬다 → `emit` 재실행.
 - **빌드 실패:** `corepack prepare pnpm@10.6.2 --activate` 후 `pnpm install && pnpm -r build`. Node 22 권장.
 
 ---

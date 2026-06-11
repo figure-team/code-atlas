@@ -23,7 +23,7 @@ U-A /understand                → .understand-anything/knowledge-graph.json
 | **①** | 플러그인 설치 사용자 | 슬래시 **`/understand-docs <projectRoot> <서브커맨드>`** — Claude(host)가 내부적으로 ②를 실행 |
 | **②** | 직접 / 개발 | **`node ${CLAUDE_PLUGIN_ROOT}/scripts/understand-docs.mjs <projectRoot> <서브커맨드>`** |
 
-> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬 4종: `/understand`(U-A) · `/understand-init` · `/understand-docs` · `/understand-export`. (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
+> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬 5종: `/understand`(U-A) · `/understand-init` · `/understand-map`(도메인 맵: scan→✋경계 확정→bundle→채움→emit — 03 기능명세의 공급원) · `/understand-docs` · `/understand-export`. (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
 
 ## 1. 사전: 지식 그래프 생성 (U-A)
 

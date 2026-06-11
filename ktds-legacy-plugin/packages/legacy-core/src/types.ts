@@ -64,6 +64,11 @@ export interface CanonicalNode {
   evidence?: Evidence;
   summary: string;
   tags: string[];
+  /**
+   * U-A domain/flow/step 노드의 domainMeta passthrough (Stage-18.1, ADR D2).
+   * entities/businessRules/crossDomainInteractions + ktds 확장(ktdsClaims 인용).
+   */
+  domainMeta?: Record<string, unknown>;
 }
 
 export interface CanonicalEdge {
