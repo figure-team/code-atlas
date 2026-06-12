@@ -86,13 +86,16 @@ node ktds-legacy-plugin/scripts/understand-map.mjs <projectRoot> status # 게이
 
 ```bash
 node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> seeds                       # 시드 매핑 카탈로그(라우트·도메인·파일)
-node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> analyze --path <파일> [--path <파일2> ...]
+node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> analyze --path <파일> [--path <파일2> ...] [--sr <SR-ID>] [--by <핸들>]
 node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> status                      # 마지막 분석 요약
+node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> status --list               # SR 보관 이력(.spec/impact/)
 ```
 
 - **전제:** `/understand-map scan` 이 `.spec/map/` 산출물을 만들어둬야 한다(없으면 안내하며 멈춤, exit 2). 흐름/도메인 영향까지 보려면 `confirm`까지 끝나 있어야 한다(아니면 `[확인 필요]` 강등).
 - **자연어→시드 매핑은 host(Claude) 역할:** 엔진은 `--path` 파일만 받는다. 슬래시 사용 시 Claude가 `seeds` 카탈로그로 자연어를 후보 파일에 매핑하고 **✋사용자 확인 게이트**를 거친 뒤 `--path`로 실행한다(SKILL.md). `--path` 없이 호출하면 임의 분석을 하지 않고 카탈로그+안내만 낸다(fail-closed).
-- **산출:** `.spec/map/impact.json`(결정론, 동일 시드+commit byte-diff=0) + `impact-verify-report.json`(근거율) + `docs/09_release/change-impact-analysis.md`(읽기전용 — 5종과 달리 **검토·승인 상태기계 밖**, registerDraft 미호출) + `IMPACT_ANALYZED` 감사.
+- **산출:** `.spec/map/impact.json`(결정론, 동일 시드+commit byte-diff=0) + `impact-verify-report.json`(근거율) + `docs/09_release/change-impact-analysis.md`(읽기전용 — 5종과 달리 **검토·승인 상태기계 밖**, registerDraft 미호출) + `IMPACT_ANALYZED` 감사. 보고서에는 **영향 규모 집계**(도메인×상류/하류·언어×상류/하류 파일 수 — 공수 산정 입력, 도메인 귀속=슬라이스 ownership: 단일 도메인=해당 도메인 · 복수=`(공용)` · 미도달/확정 밖=`(미분류)`)가 포함된다.
+- **SR 보관 (`--sr <SR-ID>`):** 분석 사본(impact.json+verify+보고서)을 `.spec/impact/<SR-ID>/`에 보관 — 동시 다발 SR을 다루는 PL의 건별 이력. 같은 SR 재분석은 덮어씀(그 SR의 최신). `status --list`로 조회. SR ID는 영숫자 시작, 영숫자·점·하이픈·밑줄만(fail-closed). 보관본도 읽기전용 분석물이다(상태기계 밖).
+- **대시보드 시각화 (자동):** analyze가 KG(`.understand-anything/knowledge-graph.json`)가 있으면 `.understand-anything/diff-overlay.json`을 발행한다 — U-A 대시보드가 이미 소비하는 입력 계약이라 **U-A 코드 무수정**. `/understand-dashboard` 구조 뷰에서 적색 ring=시드, 호박색 ring=영향(상류∪하류), 무관=흐림(`d` 토글, 재분석 후 새로고침). 한계: 2분류뿐(상류/하류 구분·API/DB 표는 보고서가 정본), 범례 "변경됨"=시드. KG 부재 시 생략, 시드 미조인 시 경고. `/understand-diff`의 기존 오버레이는 `.bak` 보존 후 덮어씀(경합은 마지막 실행 우선).
 - **API 영향 confidence:** `both`(ownership+reverse 일치)=`[확정(AI)]`, 단일 신호=교차검증 불일치(`[추정]`/`[확인 필요]`). 과도전파(hub)·`crossCheckDiff`·`needsReview`는 "영향 과대 추정 지점"으로 그대로 보고된다.
 - **DB 테이블/컬럼은 host 보강:** 엔진은 영향 매퍼 XML까지만 결정론 산출(실 KG에 reads_from/writes_to 0건). `tableCandidateSlots`의 SQL 슬라이스에서 host가 테이블/컬럼을 인용 추출하고 KG table 노드(이름→DDL 라인)로 근거를 붙인다. 동적 SQL은 `[확인 필요]`.
 - **한계:** step 입도가 라우트-선언-파일 단위라 흐름 영향은 `[추정]`. 비-Java 시드(JSP/TS/web.xml)는 edges가 java 기반이라 역방향이 빈약 → `[확인 필요]` 강등.

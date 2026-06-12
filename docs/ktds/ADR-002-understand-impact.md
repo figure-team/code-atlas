@@ -130,3 +130,23 @@
 1. `verifyCitation` export 단일화(복제 제거) Phase 2 이관 시점.
 2. downstream 보조 섹션의 장기 유용성 — 실프로젝트 피드백 후 유지/축소 재평가.
 3. 동적 SQL(`${}`/`<include>`) 테이블 추출 보강 — 대상 고객 코드 확보 후.
+
+## 부록 A. 대시보드 오버레이 + SR 워크벤치 (2026-06-12 중간 점검 후속, T10/T11)
+
+중간 점검(ultracode 워크플로 + 적대 비평)에서 확정한 두 보완 — 주 사용자를 PL로 명문화하며 식별된 "호출 표면" 갭 중 최저비용 2건.
+
+### A.1 대시보드 오버레이 (T10 — U-A 완전 무수정)
+
+`analyze`가 impact 결과를 U-A가 이미 소비하는 입력 계약 **`.understand-anything/diff-overlay.json`**(understand-diff SKILL.md §8)으로 변환 발행한다. 서버 엔드포인트(vite `/diff-overlay.json`)·로더(App.tsx — 배열 존재 + `changedNodeIds.length>0`만 검사)·렌더(CustomNode ring/fade, DiffToggle)가 전부 기성품이므로 **U-A 코드·스킬·산출물 무수정**이다.
+
+- **집합 매핑**: `changedNodeIds`=시드, `affectedNodeIds`=(상류∪하류)−시드(계약의 "excluding changedNodeIds" 준수, relPath 기준 dedup).
+- **노드 조인**: `file:<relPath>` 직조인 → type=file → type=config(매퍼 XML 실측 패턴) → id 사전순. **대표 1노드/파일**(범례 카운트=파일 수 유지). KG `filePath`가 절대경로인 프로젝트 대응으로 projectRoot 상대화 정규화를 변환기에 내장 — 서버 normalizeGraphPath와 방향 동일하되 **더 엄격**(dot-segment 거부, 분리자 경계 요구; 미조인은 unresolved 표면화라 fail-closed가 오답보다 낫다). 미조인은 `ktdsImpact.unresolved`로 echo(은폐 금지).
+- **결정론 경계**: 순수 변환(buildDiffOverlay)은 결정론, `generatedAt`만 IO 경계에서 스탬프(U-A 계약 필드, App.tsx 미사용, `.spec/map` 산출물 아님).
+- **경합**: `/understand-diff`와 같은 파일 — `baseBranch:"ktds-impact"` 마커로 출처 판별, 타 출처 파일은 `.bak` 보존 후 덮어씀(last-writer-wins 완화).
+- **한계(수용)**: diff 의미론 2분류뿐 — 시드/상류/하류 3색·깊이·API/DB 표·근거율 게이지는 표현 불가. 그 요구가 확정되면 fork 수정(C안)으로 상승하되 본 조인 로직은 재사용. 오버레이는 구조 뷰 전용(도메인/지식 뷰 미표시), dev 서버 전제. 대시보드 스키마 검증에서 drop된 노드는 범례 카운트에만 남고 하이라이트되지 않을 수 있다(오버레이는 디스크 KG 실존 id만 내보내므로 통상 불발생).
+
+### A.2 SR 워크벤치 (T11 — `--sr` 보관 + 집계)
+
+- `analyze --sr <SR-ID>` → 분석 사본(impact.json+verify+보고서)을 `.spec/impact/<SR-ID>/`에 보관(원자 쓰기). `.spec/map/impact.json`(최신 1건)·`docs/09_release/`(최신 보고서) 의미론 불변 — 보관본은 항상 사본. `status --list`로 이력 조회(손상 보관본 valid:false 표면화). SR ID는 디렉터리명 안전성 fail-closed(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`).
+- 보고서에 **영향 규모 집계** 섹션(공수 산정 입력): 도메인×상류/하류·언어×상류/하류 파일 수. 도메인 귀속=**슬라이스 ownership 기반**(owner root 파일→confirmed 도메인; 루트 자신·단일 도메인=해당 도메인, 복수 도메인=`(공용)`, 미도달·확정 밖=`(미분류)`, census 밖 lang=`(census 밖)`) — ConfirmedDomain.roots는 디렉터리가 아니라 엔트리 **파일 경로**라 prefix 매칭은 전건 미분류로 쏠리는 오답(독립 리뷰 critical로 검출·정정). ownership·roots 모두 정렬 산출물이라 결정론. 집계는 claims가 아니라 prose(파생 수치 — 확정 대상 아님).
+- **수반 수정**: engine `buildClaimItems`가 인용을 **사본**으로 담도록 정정 — 기존엔 result의 citation 참조 공유로 `fillClaimSnippets`가 in-memory result를 변이했고(디스크 정본은 변이 전 기록이라 무사), SR 보관 직렬화에서 "앵커만" 계약 위반으로 표면화. 회귀 테스트: 반환 result의 stableJson == 디스크 정본.
