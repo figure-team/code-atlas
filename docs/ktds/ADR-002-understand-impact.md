@@ -137,6 +137,8 @@
 
 ### A.1 대시보드 오버레이 (T10 — U-A 완전 무수정)
 
+> 이력: 본 절의 "diff-overlay.json 발행"은 부록 **B.2(2채널 분리)**에서 `impact-overlay.json`(예측 전용)으로 이전됐다 — diff-overlay.json은 이제 실측(/understand-review) 채널이다. 조인·정규화·.bak 규칙은 그대로 유효.
+
 `analyze`가 impact 결과를 U-A가 이미 소비하는 입력 계약 **`.understand-anything/diff-overlay.json`**(understand-diff SKILL.md §8)으로 변환 발행한다. 서버 엔드포인트(vite `/diff-overlay.json`)·로더(App.tsx — 배열 존재 + `changedNodeIds.length>0`만 검사)·렌더(CustomNode ring/fade, DiffToggle)가 전부 기성품이므로 **U-A 코드·스킬·산출물 무수정**이다.
 
 - **집합 매핑**: `changedNodeIds`=시드, `affectedNodeIds`=(상류∪하류)−시드(계약의 "excluding changedNodeIds" 준수, relPath 기준 dedup).

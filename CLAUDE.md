@@ -64,6 +64,10 @@ When pushing to remote, bump the version in **all five** of these files (keep th
 
 Note: `.claude-plugin/marketplace.json` does **not** carry a version — the `plugins[]` entry only supports `name` and `source`, and adding other fields causes marketplace schema validation failures.
 
+ktds-legacy plugin (this fork's addition) carries its own version in **two** more files — bump together when ktds code changes:
+- `ktds-legacy-plugin/.claude-plugin/plugin.json` → `"version"` field
+- `ktds-legacy-plugin/packages/legacy-core/package.json` → `"version"` field
+
 ## Testing Local Plugin Changes
 
 Claude Code caches installed plugins at `~/.claude/plugins/cache/understand-anything/understand-anything/<version>/`. Symlinks don't work because Claude's Search/Glob tools can't follow them. To test local changes:
