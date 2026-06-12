@@ -20,10 +20,12 @@ U-A /understand                → .understand-anything/knowledge-graph.json
   → ktds /understand-export    → 단일 HTML (CDN 없음)
 
   〔MVP+ · 분석 산출물〕
-  → ktds /understand-impact    → docs/09_release/change-impact-analysis.md (읽기전용)
+  → ktds /understand-impact    → docs/09_release/change-impact-analysis.md (읽기전용, 예측)
       seeds                    → 시드 매핑 카탈로그 (자연어→파일, host 역할)
       analyze --path <file>... → 역/정 도달성 → API·DB·흐름·연관모듈 영향 + 근거 검증
-      status                   → 마지막 분석 요약
+      status [--list]          → 마지막 분석 요약 / SR 보관 이력
+  → ktds /understand-review    → docs/09_release/change-review-checklist.md (읽기전용, 실측)
+      analyze [--base][--sr]   → git 변경분 → 도달성 영향 + 사전 예측 대조
 ```
 
 ### 호출 방식 — 두 가지 (아래 모든 예시는 ②로 표기)
@@ -33,7 +35,7 @@ U-A /understand                → .understand-anything/knowledge-graph.json
 | **①** | 플러그인 설치 사용자 | 슬래시 **`/understand-docs <projectRoot> <서브커맨드>`** — Claude(host)가 내부적으로 ②를 실행 |
 | **②** | 직접 / 개발 | **`node ${CLAUDE_PLUGIN_ROOT}/scripts/understand-docs.mjs <projectRoot> <서브커맨드>`** |
 
-> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬: `/understand`(U-A) · `/understand-init` · `/understand-map`(도메인 맵: scan→✋경계 확정→bundle→채움→emit — 03 기능명세의 공급원) · `/understand-docs` · `/understand-export` · 〔MVP+〕 `/understand-impact`(변경 영향도 — §2-2). (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
+> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬: `/understand`(U-A) · `/understand-init` · `/understand-map`(도메인 맵: scan→✋경계 확정→bundle→채움→emit — 03 기능명세의 공급원) · `/understand-docs` · `/understand-export` · 〔MVP+〕 `/understand-impact`(변경 영향도 예측 — §2-2) · `/understand-review`(변경분 실측 리뷰 — §2-3). (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
 
 ## 1. 사전: 지식 그래프 생성 (U-A)
 
@@ -95,14 +97,29 @@ node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> status --lis
 - **자연어→시드 매핑은 host(Claude) 역할:** 엔진은 `--path` 파일만 받는다. 슬래시 사용 시 Claude가 `seeds` 카탈로그로 자연어를 후보 파일에 매핑하고 **✋사용자 확인 게이트**를 거친 뒤 `--path`로 실행한다(SKILL.md). `--path` 없이 호출하면 임의 분석을 하지 않고 카탈로그+안내만 낸다(fail-closed).
 - **산출:** `.spec/map/impact.json`(결정론, 동일 시드+commit byte-diff=0) + `impact-verify-report.json`(근거율) + `docs/09_release/change-impact-analysis.md`(읽기전용 — 5종과 달리 **검토·승인 상태기계 밖**, registerDraft 미호출) + `IMPACT_ANALYZED` 감사. 보고서에는 **영향 규모 집계**(도메인×상류/하류·언어×상류/하류 파일 수 — 공수 산정 입력, 도메인 귀속=슬라이스 ownership: 단일 도메인=해당 도메인 · 복수=`(공용)` · 미도달/확정 밖=`(미분류)`)가 포함된다.
 - **SR 보관 (`--sr <SR-ID>`):** 분석 사본(impact.json+verify+보고서)을 `.spec/impact/<SR-ID>/`에 보관 — 동시 다발 SR을 다루는 PL의 건별 이력. 같은 SR 재분석은 덮어씀(그 SR의 최신). `status --list`로 조회. SR ID는 영숫자 시작, 영숫자·점·하이픈·밑줄만(fail-closed). 보관본도 읽기전용 분석물이다(상태기계 밖).
-- **대시보드 시각화 (자동):** analyze가 KG(`.understand-anything/knowledge-graph.json`)가 있으면 `.understand-anything/diff-overlay.json`을 발행한다(U-A가 이미 소비하는 입력 계약). `/understand-dashboard`에서 `d` 토글, 재분석 후 새로고침:
-  - **구조 뷰** — 시드="변경됨" 배지(적), 영향(상류∪하류)="영향받음" 배지(호박), 무관 노드=흐림. **계층(첫 화면) 카드·폴더 컨테이너**에 변경/영향 개수 칩 + 적/호박 테두리(무관 계층 흐림) — 드릴인 없이 위치 식별.
+- **대시보드 시각화 (자동 — 예측 채널):** analyze가 KG(`.understand-anything/knowledge-graph.json`)가 있으면 **`.understand-anything/impact-overlay.json`(예측 전용 채널)**을 발행한다. `/understand-dashboard`의 **'영향도' 토글(`i` 키)** — 적색="시드" 배지, 호박색="영향" 배지, 재분석 후 새로고침:
+  - **구조 뷰** — 노드 배지 + 무관 노드 흐림. **계층(첫 화면) 카드·폴더 컨테이너**에 개수 칩 + 적/호박 테두리(무관 계층 흐림) — 드릴인 없이 위치 식별.
   - **도메인 뷰** — 도메인/흐름 카드에 개수 칩, step에 배지(체인에 등장하는 파일만 — 도달 폐포 전체는 구조 뷰·보고서가 정본).
-  - 한계: 상류/하류 구분 색·API/DB 표는 대시보드에 없음(보고서 .md가 정본), 범례·배지 "변경됨"=시드. KG 부재 시 생략, 시드 미조인 시 경고. `/understand-diff`의 기존 오버레이는 `.bak` 보존 후 덮어씀(경합은 마지막 실행 우선). 표시 강화는 U-A fork 최소 수정(무수정 예외 #2 — [UPSTREAM_MERGE.md](./UPSTREAM_MERGE.md), ADR-002 부록 A.3).
+  - **Diff 토글(`d` 키)은 별개 채널** — 실측 비교(§2-3 /understand-review, 라벨 "변경됨/영향받음"). 두 토글은 배타적이고, 둘 다 데이터가 있으면 최신 분석이 자동 활성.
+  - 한계: 상류/하류 구분 색·API/DB 표는 대시보드에 없음(보고서 .md가 정본). KG 부재 시 생략, 시드 미조인 시 경고. 대시보드는 ADR-003에 따라 ktds 소유(분기).
 - **API 영향 confidence:** `both`(ownership+reverse 일치)=`[확정(AI)]`, 단일 신호=교차검증 불일치(`[추정]`/`[확인 필요]`). 과도전파(hub)·`crossCheckDiff`·`needsReview`는 "영향 과대 추정 지점"으로 그대로 보고된다.
 - **DB 테이블/컬럼은 host 보강:** 엔진은 영향 매퍼 XML까지만 결정론 산출(실 KG에 reads_from/writes_to 0건). `tableCandidateSlots`의 SQL 슬라이스에서 host가 테이블/컬럼을 인용 추출하고 KG table 노드(이름→DDL 라인)로 근거를 붙인다. 동적 SQL은 `[확인 필요]`.
 - **한계:** step 입도가 라우트-선언-파일 단위라 흐름 영향은 `[추정]`. 비-Java 시드(JSP/TS/web.xml)는 edges가 java 기반이라 역방향이 빈약 → `[확인 필요]` 강등.
 - 정확도 하네스: `scripts/impact-recall.mjs <root> <expected.json> --min-recall <p> --min-precision <p>`(사람 작성 정답지 대비 recall+precision).
+
+## 2-3. 변경분 실측 리뷰 (/understand-review — MVP+, 읽기전용)
+
+§2-2가 "바꾸면 어디까지?"(예측)라면, 이건 **"실제로 바뀐 것의 영향"**(실측)이다. `git diff`(base..워킹트리, **미커밋 포함**)가 보고한 변경 파일을 같은 결정론 엔진에 시드로 투입한다 — 코드 리뷰·머지 전·배포 전 게이트용. **git 저장소 필수**(아니면 exit 2).
+
+```bash
+node ktds-legacy-plugin/scripts/understand-review.mjs <projectRoot> analyze [--base <ref>] [--sr <SR-ID>] [--by <핸들>]
+```
+
+- **base 기본값** = 마지막 map 스캔 시점 commit(census.gitCommit) — "그때 이후 바뀐 것 전부". 특정 브랜치 대비는 `--base origin/main`. 실행 시 map을 자동 재스캔해 현재 코드 기준으로 계산한다(도메인 confirm 게이트 무관).
+- **산출:** `.spec/map/review.json` + `review-verify-report.json`(예측 산출물 `impact.json`은 보존) + `docs/09_release/change-review-checklist.md`(읽기전용) + `REVIEW_ANALYZED` 감사. 시드=실제 변경 파일(`[확정(AI)]` — git 사실). 삭제 파일은 도달성 밖이라 "수동 확인" 절로 분리.
+- **예측 대조 (`--sr`):** 사전 영향 분석 보관본과 대조 — **예측 밖 변경**(사전 영향 범위에 없던 파일이 바뀜 → 변경 사유 확인)과 **예측 시드 미변경**(계획 변경/작업 누락 후보)을 체크리스트에 경고. 리뷰 결과는 같은 SR 폴더에 보관되어 예측·실측이 나란히 남는다(`status --list`에 `[리뷰 있음]`).
+- **대시보드:** `.understand-anything/diff-overlay.json`(실측 채널) 발행 — **Diff 토글(`d` 키)**, 적색="변경됨"(진짜 변경), 호박색="영향받음". U-A `/understand-diff`가 쓴 기존 파일은 `.bak` 보존 후 덮어씀.
+- **주의:** untracked 신규 파일도 변경분에 포함된다(census와 동일 기준 — `git add` 불필요). 비-git(SVN 등) 프로젝트에서는 이 기능을 쓸 수 없다(예측 분석은 가능). **커밋된 변경을 리뷰할 땐 `--base`를 명시**하라 — 리뷰 실행이 map을 재스캔해 기본 base(census.gitCommit)가 현재 HEAD로 이동하므로, 커밋 후 두 번째 기본 실행은 "변경 없음"이 된다.
 
 ## 3. 문서 생성
 

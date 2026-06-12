@@ -9,7 +9,7 @@
 
 ## 기술 레퍼런스
 - [ADR-001-understand-map.md](./ADR-001-understand-map.md) — `/understand-map` 결정 기록 (결정론 skeleton → ✋게이트 → LLM 채움 → 기계 검증 → 병합, 수용 기준 M1~M7 — **Accepted**)
-- [ADR-002-understand-impact.md](./ADR-002-understand-impact.md) — `/understand-impact` 변경 영향도 결정 기록 (역/정 도달성으로 API/DB/흐름/연관모듈 영향 결정론 산출 + 인용 검증, 읽기전용 분석물, 수용 기준 N1~N7 — **Accepted**. 부록 A: SR 워크벤치 `--sr`/영향 규모 집계·대시보드 diff 오버레이·구조/계층/도메인 뷰 표시)
+- [ADR-002-understand-impact.md](./ADR-002-understand-impact.md) — `/understand-impact` 변경 영향도 결정 기록 (역/정 도달성으로 API/DB/흐름/연관모듈 영향 결정론 산출 + 인용 검증, 읽기전용 분석물, 수용 기준 N1~N7 — **Accepted**. 부록 A: SR 워크벤치 `--sr`/영향 규모 집계·대시보드 오버레이·구조/계층/도메인 뷰 표시. 부록 B: `/understand-review` 실측 리뷰·예측 대조·오버레이 2채널)
 - [UA_BASELINE.md](./UA_BASELINE.md) — U-A v2.7.3 검증된 노드/엣지 타입·필드 (kg-reader 기준)
 - [ADR-003-upstream-strategy.md](./ADR-003-upstream-strategy.md) — upstream 추종 전략 개정: **대시보드 부분 분기** (대시보드=ktds 소유·merge 시 ours·선별 cherry-pick, 분석 파이프라인=추종 유지 — **Accepted**)
 - [UPSTREAM_MERGE.md](./UPSTREAM_MERGE.md) — U-A fork upstream 추종 절차 (소유 경계·merge ours 절차 — ADR-003 반영)

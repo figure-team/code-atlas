@@ -162,3 +162,21 @@ PL 실사용 피드백 2건으로 C안의 **가독성 부분만** 선행 채택:
 - **도메인 뷰 투영** (같은 날 추가): 오버레이의 KG 노드 id를 store `nodesById`로 **filePath 집합**으로 환산해 도메인 그래프와 조인 — step은 `filePath` 직조인(배지), 흐름은 entry 파일∪소속 step 파일 멤버 집계(칩), 도메인은 흐름 멤버 합집합 집계(칩). 무관 노드 흐림 + 전체-fade 가드 동일. id 체계가 달라(domain:/flow:/step: vs file:/config:) 경로 조인이 유일한 결합점이며, 양쪽 그래프 모두 서버가 filePath를 상대화해 서빙하므로 안전.
 
 여전히 미해소(완전 C안 영역): 시드/상류/하류 3색, minDepth 깊이, API/DB 영향 표·근거율 게이지 패널, 지식 뷰 표시. 변경 파일이 어느 계층에도 안 속하면 계층 칩에는 안 잡힌다(디테일 뷰에서는 보임). 도메인 뷰는 step 입도가 라우트 체인 파일 단위라 도달 폐포 전체가 아니라 **체인에 등장하는 파일만** 표시된다.
+
+## 부록 B. /understand-review 실측 리뷰 + 오버레이 2채널 분리 (2026-06-12, T12)
+
+사용자 결정: "diff on/off = 이전 분석 대비 실측 비교, 영향도 예측은 별도 토글"(ADR-003 분기와 같은 날). 예측↔실측 루프를 닫는다.
+
+### B.1 /understand-review (실측)
+
+- **의미론**: `/understand-impact`("바꾸면 어디까지?" — 사전 예측)의 짝 — `git diff <base>`(base 기본값=마지막 map 스캔 commit, **워킹트리 미커밋 포함**)가 보고한 **실제 변경 파일**을 같은 impact 엔진에 시드(origin `git`, `[확정(AI)]` — 기계 사실)로 투입. 두 시점 map의 스냅샷 비교가 아니라 **git 커밋 앵커 + 현재 그래프 도달성**이다(map은 분석 전 자동 재스캔, confirm 게이트 무관).
+- **산출 분리**: engine `analyzeImpact`에 artifacts 파일명 오버라이드 추가 — review는 `review.json`/`review-verify-report.json`으로 써서 예측 정본(`impact.json`)을 보존. 체크리스트는 `buildChangeImpact` 섹션을 재사용하고 앞에 리뷰 범위(git)·삭제 파일(수동 확인 — 도달성 밖)·**예측 대조** 절을 끼운다.
+- **예측 대조(`--sr`)**: 사전 보관본과 집합 비교 — 예측 밖 변경 = 변경 − (예측 시드∪상류∪하류), 예측 시드 미변경 = 예측 시드 − 변경. 리뷰 보관본은 같은 SR 폴더에 review-* 파일명으로 — 예측·실측이 나란히(`status --list` `[리뷰 있음]`).
+- **fail-closed**: 비-git/잘못된 ref → ReviewGitError exit 2. untracked 신규 파일은 git diff 한계로 미포착(문서 명시). 변경 0건 → 분석 없이 종료.
+- 감사: `REVIEW_ANALYZED`(base·변경/삭제 수·대조 수치·overlay 요약, 실패는 archiveError/overlayError로 기록 후 exit 1).
+
+### B.2 오버레이 2채널 (대시보드 — ADR-003 분기 후 자유 개조)
+
+- **채널**: 예측=`impact-overlay.json`(마커 `ktds-impact`, '영향도' 토글 `i`, 라벨 "시드/영향") / 실측=`diff-overlay.json`(마커 `ktds-review:<base>`, Diff 토글 `d`, 라벨 "변경됨/영향받음" — U-A understand-diff 의미론과 일치, 그 파일과의 경합은 기존 `.bak` 규칙 유지). A안의 "라벨 변경됨=시드 오독"과 last-writer-wins 경합이 구조적으로 해소.
+- **배타 표시**: store가 채널 원본 2개 + 활성 1개(`overlaySource`) — 토글은 배타 전환, 자동 활성은 `generatedAt` 최신. 모든 뷰(구조/계층/도메인)는 활성 집합만 읽으므로 기존 배지·칩·fade가 두 채널에 그대로 작동하고, 라벨만 `overlaySource` 구독으로 전환. locale 7파일에 `impactToggle`·`toggleImpact` 키 추가.
+- **마이그레이션**: ≤0.8.0의 예측이 diff-overlay.json에 직접 쓴 잔재(`baseBranch:"ktds-impact"`)는 impact analyze 시 자동 제거(타 출처는 보존).
