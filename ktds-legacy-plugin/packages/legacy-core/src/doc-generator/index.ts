@@ -280,9 +280,17 @@ function renderClaim(c: Claim): string {
   return `- ${tag} ${c.claim}${cite}`;
 }
 
-/** GeneratedDoc → Markdown 문자열 (skeleton 결정론; prose가 있으면 섹션 본문에 포함). */
-export function renderMarkdown(doc: GeneratedDoc): string {
-  const lines: string[] = [`# ${doc.title}`, "", "> 상태: DRAFT · ktds doc-generator · 근거 기반 자동 생성", ""];
+/** 발행 헤더 상태문 기본값 (5종 문서) — statusLine 미지정 시 골든 불변. */
+export const DEFAULT_STATUS_LINE = "상태: DRAFT · ktds doc-generator · 근거 기반 자동 생성";
+
+/**
+ * GeneratedDoc → Markdown 문자열 (skeleton 결정론; prose가 있으면 섹션 본문에 포함).
+ * statusLine은 헤더 인용문(`> …`) — 기본값은 5종 문서용 DRAFT 상태문이라
+ * 기존 골든 스냅샷이 그대로 유지된다. /understand-impact는 읽기전용 상태문을
+ * 넘겨 doc-state 밖 분석 산출물임을 표기한다 (ADR-002 ID2, statusLine 파라미터).
+ */
+export function renderMarkdown(doc: GeneratedDoc, statusLine: string = DEFAULT_STATUS_LINE): string {
+  const lines: string[] = [`# ${doc.title}`, "", `> ${statusLine}`, ""];
   for (const s of doc.sections) {
     lines.push(`## ${s.heading}`, "");
     if (s.prose && s.prose.trim()) lines.push(s.prose.trim(), "");

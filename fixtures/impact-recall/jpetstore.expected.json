@@ -1,0 +1,74 @@
+{
+  "project": "jpetstore-6",
+  "source": "https://github.com/mybatis/jpetstore-6 (default branch)",
+  "method": "수동 소스 열람 + chain-recall 정답지(forward) 기반으로 작성한 영향 정답지(2026-06-12). 산출물에서 역산하지 않음 — ADR-002 N3 게이트의 오라클. upstream=시드에 의존하는 호출자, mappers=시드가 정방향으로 도달하는 매퍼 XML.",
+  "cases": [
+    {
+      "_note": "단일 영향: AccountService는 AccountActionBean만 사용. DB는 AccountMapper만.",
+      "seeds": ["src/main/java/org/mybatis/jpetstore/service/AccountService.java"],
+      "mustAffect": {
+        "upstreamFiles": ["src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java"],
+        "api": ["route:ANY /actions/Account.action"],
+        "mappers": ["src/main/resources/org/mybatis/jpetstore/mapper/AccountMapper.xml"],
+        "flows": ["flow:ANY /actions/Account.action"]
+      },
+      "mustNotAffect": [
+        "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java",
+        "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+        "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java"
+      ]
+    },
+    {
+      "_note": "DB downstream: OrderService는 OrderActionBean만 사용하나, ItemMapper·LineItemMapper·OrderMapper·SequenceMapper 4개 매퍼에 의존.",
+      "seeds": ["src/main/java/org/mybatis/jpetstore/service/OrderService.java"],
+      "mustAffect": {
+        "upstreamFiles": ["src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java"],
+        "api": ["route:ANY /actions/Order.action"],
+        "mappers": [
+          "src/main/resources/org/mybatis/jpetstore/mapper/ItemMapper.xml",
+          "src/main/resources/org/mybatis/jpetstore/mapper/LineItemMapper.xml",
+          "src/main/resources/org/mybatis/jpetstore/mapper/OrderMapper.xml",
+          "src/main/resources/org/mybatis/jpetstore/mapper/SequenceMapper.xml"
+        ],
+        "flows": ["flow:ANY /actions/Order.action"]
+      },
+      "mustNotAffect": [
+        "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+        "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java",
+        "src/main/resources/org/mybatis/jpetstore/mapper/AccountMapper.xml"
+      ]
+    },
+    {
+      "_note": "다중 영향(공용 서비스): CatalogService는 Account·Cart·Catalog ActionBean이 사용(Order는 아님). DB는 Category·Item·Product 매퍼.",
+      "seeds": ["src/main/java/org/mybatis/jpetstore/service/CatalogService.java"],
+      "mustAffect": {
+        "upstreamFiles": [
+          "src/main/java/org/mybatis/jpetstore/web/actions/AccountActionBean.java",
+          "src/main/java/org/mybatis/jpetstore/web/actions/CartActionBean.java",
+          "src/main/java/org/mybatis/jpetstore/web/actions/CatalogActionBean.java"
+        ],
+        "api": [
+          "route:ANY /actions/Account.action",
+          "route:ANY /actions/Cart.action",
+          "route:ANY /actions/Catalog.action"
+        ],
+        "mappers": [
+          "src/main/resources/org/mybatis/jpetstore/mapper/CategoryMapper.xml",
+          "src/main/resources/org/mybatis/jpetstore/mapper/ItemMapper.xml",
+          "src/main/resources/org/mybatis/jpetstore/mapper/ProductMapper.xml"
+        ],
+        "flows": [
+          "flow:ANY /actions/Account.action",
+          "flow:ANY /actions/Cart.action",
+          "flow:ANY /actions/Catalog.action"
+        ]
+      },
+      "mustNotAffect": [
+        "src/main/java/org/mybatis/jpetstore/web/actions/OrderActionBean.java"
+      ]
+    }
+  ],
+  "knownGaps": [
+    "OrderActionBean→AccountActionBean/CartActionBean 메서드 본문 지역변수 캐스팅 간선은 edges에 없음(chain-recall knownGap 동일) — Order 시드의 상류에 Account/Cart 호출자가 안 잡혀도 결손이 아니라 기준선."
+  ]
+}

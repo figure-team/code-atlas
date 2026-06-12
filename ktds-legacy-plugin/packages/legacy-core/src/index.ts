@@ -12,3 +12,4 @@ export * from "./doc-generator/index.js";
 export * from "./export/index.js";
 export * from "./orchestrator/index.js";
 export * from "./domain-map/index.js";
+export * from "./impact/index.js";
