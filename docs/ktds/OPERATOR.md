@@ -18,6 +18,12 @@ U-A /understand                → .understand-anything/knowledge-graph.json
       return --doc             → UNDER_REVIEW→RETURNED
       audit --list/--date      → 감사 로그 조회
   → ktds /understand-export    → 단일 HTML (CDN 없음)
+
+  〔MVP+ · 분석 산출물〕
+  → ktds /understand-impact    → docs/09_release/change-impact-analysis.md (읽기전용)
+      seeds                    → 시드 매핑 카탈로그 (자연어→파일, host 역할)
+      analyze --path <file>... → 역/정 도달성 → API·DB·흐름·연관모듈 영향 + 근거 검증
+      status                   → 마지막 분석 요약
 ```
 
 ### 호출 방식 — 두 가지 (아래 모든 예시는 ②로 표기)
@@ -27,7 +33,7 @@ U-A /understand                → .understand-anything/knowledge-graph.json
 | **①** | 플러그인 설치 사용자 | 슬래시 **`/understand-docs <projectRoot> <서브커맨드>`** — Claude(host)가 내부적으로 ②를 실행 |
 | **②** | 직접 / 개발 | **`node ${CLAUDE_PLUGIN_ROOT}/scripts/understand-docs.mjs <projectRoot> <서브커맨드>`** |
 
-> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬 5종: `/understand`(U-A) · `/understand-init` · `/understand-map`(도메인 맵: scan→✋경계 확정→bundle→채움→emit — 03 기능명세의 공급원) · `/understand-docs` · `/understand-export`. (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
+> 즉 아래 예시의 **`node …/understand-docs.mjs` 를 `/understand-docs` 로 바꾸면 그대로 슬래시(플러그인) 형태**가 된다. `<서브커맨드>`(`review --list`, `confirm --doc <f>`, `approve --doc <f> --by <handle>` …)는 두 방식이 동일하다. 스킬: `/understand`(U-A) · `/understand-init` · `/understand-map`(도메인 맵: scan→✋경계 확정→bundle→채움→emit — 03 기능명세의 공급원) · `/understand-docs` · `/understand-export` · 〔MVP+〕 `/understand-impact`(변경 영향도 — §2-2). (플러그인 **설치/업데이트/삭제**는 [INSTALL.md](./INSTALL.md) §2~§4의 `/plugin …` 명령.)
 
 ## 1. 사전: 지식 그래프 생성 (U-A)
 
@@ -73,6 +79,24 @@ node ktds-legacy-plugin/scripts/understand-map.mjs <projectRoot> status # 게이
 - 확정은 `.spec/map/domain-plan.confirmed.json`으로 영속(재실행의 결정론 닻) + `MAP_PLAN_CONFIRMED` 감사. 코드가 변해 루트가 증감하면 scan이 **드리프트 경고**를 낸다 → 재확정.
 - emit의 기계검증: 인용 경로 실존 → 라인 범위 → 텍스트 일치 → 사소 스니펫 무효. 실패 항목은 삭제 대신 **`[확인 필요]` 강등** — 03 문서에서 항목 확정 워크플로(§4-1)에 자연 합류한다. 근거율 리포트: `.spec/map/verify-report.json`. 실패 도메인만 fill 재작성 후 emit 재실행(멱등).
 - 슬래시(비-TTY) confirm은 임의 전체 확정이 차단되고 Claude가 항목 단위로 묻는다 (`understand-docs` confirm과 동일 원칙).
+
+## 2-2. 변경 영향도 분석 (/understand-impact — MVP+, 읽기전용)
+
+"이 파일/기능을 바꾸면 어디까지 영향이 갈까?"를 결정론으로 답한다 (ADR-002). `/understand-map scan` 산출물(`.spec/map/`) 위에서 **재스캔 없이** 역/정 도달성을 계산한다. **upstream(역방향)=영향받는 호출자 → API·진입점·업무 흐름**, **downstream(정방향)=의존 협력자 → DB·영속성(매퍼)**.
+
+```bash
+node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> seeds                       # 시드 매핑 카탈로그(라우트·도메인·파일)
+node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> analyze --path <파일> [--path <파일2> ...]
+node ktds-legacy-plugin/scripts/understand-impact.mjs <projectRoot> status                      # 마지막 분석 요약
+```
+
+- **전제:** `/understand-map scan` 이 `.spec/map/` 산출물을 만들어둬야 한다(없으면 안내하며 멈춤, exit 2). 흐름/도메인 영향까지 보려면 `confirm`까지 끝나 있어야 한다(아니면 `[확인 필요]` 강등).
+- **자연어→시드 매핑은 host(Claude) 역할:** 엔진은 `--path` 파일만 받는다. 슬래시 사용 시 Claude가 `seeds` 카탈로그로 자연어를 후보 파일에 매핑하고 **✋사용자 확인 게이트**를 거친 뒤 `--path`로 실행한다(SKILL.md). `--path` 없이 호출하면 임의 분석을 하지 않고 카탈로그+안내만 낸다(fail-closed).
+- **산출:** `.spec/map/impact.json`(결정론, 동일 시드+commit byte-diff=0) + `impact-verify-report.json`(근거율) + `docs/09_release/change-impact-analysis.md`(읽기전용 — 5종과 달리 **검토·승인 상태기계 밖**, registerDraft 미호출) + `IMPACT_ANALYZED` 감사.
+- **API 영향 confidence:** `both`(ownership+reverse 일치)=`[확정(AI)]`, 단일 신호=교차검증 불일치(`[추정]`/`[확인 필요]`). 과도전파(hub)·`crossCheckDiff`·`needsReview`는 "영향 과대 추정 지점"으로 그대로 보고된다.
+- **DB 테이블/컬럼은 host 보강:** 엔진은 영향 매퍼 XML까지만 결정론 산출(실 KG에 reads_from/writes_to 0건). `tableCandidateSlots`의 SQL 슬라이스에서 host가 테이블/컬럼을 인용 추출하고 KG table 노드(이름→DDL 라인)로 근거를 붙인다. 동적 SQL은 `[확인 필요]`.
+- **한계:** step 입도가 라우트-선언-파일 단위라 흐름 영향은 `[추정]`. 비-Java 시드(JSP/TS/web.xml)는 edges가 java 기반이라 역방향이 빈약 → `[확인 필요]` 강등.
+- 정확도 하네스: `scripts/impact-recall.mjs <root> <expected.json> --min-recall <p> --min-precision <p>`(사람 작성 정답지 대비 recall+precision).
 
 ## 3. 문서 생성
 
@@ -147,7 +171,7 @@ node …/understand-docs.mjs <root> confirm --doc 04_api-spec.md --all  --by ipa
 - `approvals.json` — 승인 기록(doc·by·at)
 - `audit/YYYY-MM-DD.jsonl` — 감사 로그(append-only)
 
-감사 이벤트: `LLM_REQUEST` · `DOC_GENERATED` · `DOC_ITEM_CONFIRMED` · `DOC_APPROVED` · `RUN_ABORTED` · `INIT_RERUN` · `STALE_LOCK_REMOVED`. (보안 이벤트는 Phase 2)
+감사 이벤트: `LLM_REQUEST` · `DOC_GENERATED` · `DOC_ITEM_CONFIRMED` · `DOC_APPROVED` · `RUN_ABORTED` · `INIT_RERUN` · `STALE_LOCK_REMOVED` · `MAP_PLAN_CONFIRMED`(도메인 경계 확정) · `IMPACT_ANALYZED`(변경 영향 분석). (보안 이벤트는 Phase 2)
 
 ## 5. 내보내기
 

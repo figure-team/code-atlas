@@ -9,6 +9,7 @@
 
 ## 기술 레퍼런스
 - [ADR-001-understand-map.md](./ADR-001-understand-map.md) — `/understand-map` 결정 기록 (결정론 skeleton → ✋게이트 → LLM 채움 → 기계 검증 → 병합, 수용 기준 M1~M7 — **Accepted**)
+- [ADR-002-understand-impact.md](./ADR-002-understand-impact.md) — `/understand-impact` 변경 영향도 결정 기록 (역/정 도달성으로 API/DB/흐름/연관모듈 영향 결정론 산출 + 인용 검증, 읽기전용 분석물, 수용 기준 N1~N7 — **Accepted**)
 - [UA_BASELINE.md](./UA_BASELINE.md) — U-A v2.7.3 검증된 노드/엣지 타입·필드 (kg-reader 기준)
 - [UPSTREAM_MERGE.md](./UPSTREAM_MERGE.md) — U-A fork upstream 추종 절차
 
