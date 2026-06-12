@@ -9,35 +9,33 @@
   - `fixtures/`, `docs/ktds/`
 - 통합은 U-A 내부 TS API import가 아니라 on-disk `knowledge-graph.json` 계약을 통한다.
 
-## 알려진 merge 충돌점 (additive 2곳 + 무수정 예외 2건)
-ktds가 손대는 upstream 매니페스트는 **2개**(둘 다 additive). 추가로 무수정 예외가 **2건**:
+## 소유 경계 (ADR-003, 2026-06-12 개정)
+
+- **대시보드(`understand-anything-plugin/packages/dashboard/**`) = ktds 소유 (분기).** 자유 개조 — 마커 의무 없음(기존 `// ktds-fork` 주석은 참고용). upstream merge 시 이 경로는 **무조건 ours**, 필요한 upstream UI 개선만 선별 cherry-pick. (과거 "무수정 예외 #1 vite ko 1줄, #2 diff 가독성 8파일"은 이 경로 안이므로 본 결정에 흡수 — 더 이상 개별 추적하지 않는다.)
+- **그 외(`packages/core`, `skills/`, `agents/`, 루트) = upstream 추종 (무수정).** KG 계약은 fingerprint 가드 + `UA_BASELINE.md`로 감시.
+
+## 알려진 merge 충돌점 (additive 2곳)
+ktds가 손대는 upstream 매니페스트는 **2개**(둘 다 additive):
 1. `pnpm-workspace.yaml` — `ktds-legacy-plugin/packages/*`, `ktds-legacy-plugin` glob 추가
 2. `.claude-plugin/marketplace.json` — `plugins[]`에 `ktds-legacy` 항목 추가
 
-**무수정 예외 #1** (fork 제품화상 불가피 — 한국 고객 기본 언어):
-3. `understand-anything-plugin/packages/dashboard/vite.config.ts` — dev server `/config.json` 핸들러의 fallback `outputLanguage` 기본값을 `"en"` → **`"ko"`** (1줄). 대시보드는 분석 프로젝트 `.understand-anything/config.json`의 `outputLanguage`로 UI 언어를 정하는데, 그 파일이 없을 때의 기본값이다. ktds 파이프라인(`understand-init`)이 `.understand-anything/config.json`에 `outputLanguage:ko`를 써두므로 데이터로도 보장되지만, 순수 U-A 경로(`/understand`→`/understand-dashboard`만)를 위한 안전망. **U-A의 i18n·`ko.ts` 번역은 원본 그대로 활용**(코드 추가 없음).
-
-**무수정 예외 #2** (2026-06-12, ADR-002 부록 A.3 — diff 오버레이 가독성, PL 실사용 피드백):
-4. `understand-anything-plugin/packages/dashboard/src/components/` 8파일 — diff 오버레이의 변경/영향을 **명시 배지·집계 칩·fade/글로우**로 표시. 전 수정부에 `// ktds-fork` 주석 마커. 신규 locale 키 없음(기존 `t.diffToggle.changed/affected` 재사용), 신규 파일 없음:
-   - `CustomNode.tsx` — 노드 헤더에 "변경됨"/"영향받음" 배지 칩 (ring 색만으로는 구분 불가 피드백)
-   - `ContainerNode.tsx` — 변경/영향 **개수 칩** + 테두리 색 구분(변경 포함=적색, 영향만=호박색 — 기존엔 둘 다 적색 단일 플래그)
-   - `LayerClusterNode.tsx` — 계층(오버뷰 첫 화면) 카드에 동일 칩+테두리+글로우, 무관 계층 `diff-faded` 흐림
-   - `GraphView.tsx` — `diffContainers` Set→개수 Map, `useOverviewGraph`에 계층별 diff 집계·fade 배선
-   - `DomainGraphView.tsx` — 도메인 뷰 투영: 오버레이 KG id→filePath 환산(store nodesById), 도메인/흐름 멤버(entry∪step 파일) 집계, step filePath 조인
-   - `DomainClusterNode.tsx` / `FlowNode.tsx` — 개수 칩+테두리+글로우, 무관 노드 흐림
-   - `StepNode.tsx` — "변경됨"/"영향받음" 배지+테두리, 무관 step 흐림
-
-upstream merge 시 1·2는 additive 라인 재적용, 3은 해당 1줄(`outputLanguage: "ko"`) 재적용, 4는 `// ktds-fork` 마커 블록을 재적용한다(충돌 시 `git log -p -- <파일>`로 ktds 커밋 diff 참조).
+upstream merge 시 1·2는 additive 라인 재적용, 대시보드 충돌은 전부 ours(아래 절차).
 
 ## 절차
 ```bash
 git fetch upstream
-git merge upstream/main          # 충돌은 위 2개 매니페스트로 한정
-# 충돌 해결 후:
+git merge upstream/main
+# 대시보드는 ktds 소유(ADR-003) — 충돌 여부와 무관하게 우리 것 유지:
+git checkout --ours -- understand-anything-plugin/packages/dashboard
+git add understand-anything-plugin/packages/dashboard
+# 나머지 충돌은 위 2개 매니페스트(additive 재적용)로 한정. 해결 후:
 pnpm install
 pnpm -r build && pnpm -r test    # ktds + U-A 빌드/테스트
+pnpm --filter @understand-anything/dashboard build   # 분기 대시보드 빌드 확인
 # 스키마 드리프트 점검 (A14): kg-reader fingerprint 가드가 UA_BASELINE과 비교
 #   불일치 시 docs/ktds/UA_BASELINE.md 갱신 + kg-reader 매핑 조정 + ADR
+# upstream 대시보드에 원하는 개선이 있으면 별도 cherry-pick:
+#   git log upstream/main -- understand-anything-plugin/packages/dashboard 로 식별 후 수동 이식
 ```
 
 ## v2.7.3 고정의 범위
