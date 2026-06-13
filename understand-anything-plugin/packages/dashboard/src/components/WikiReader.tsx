@@ -2,9 +2,9 @@
 // 그래프 대신 메인 영역에 표시한다 — 상단 메타(태그·카테고리·백링크·연결)만 남기고
 // 그 아래 노트 전체 본문(마크다운)을 렌더. 네비게이션은 Files 폴더 트리(사이드바).
 import type { ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
 import { useDashboardStore } from "../store";
 import type { GraphNode } from "@understand-anything/core/types";
+import ClaimsContent from "./ClaimsContent";
 
 const MD_COMPONENTS = {
   h1: ({ children }: { children?: ReactNode }) => <h1 className="text-xl font-heading text-text-primary mt-4 mb-2">{children}</h1>,
@@ -155,7 +155,7 @@ export default function WikiReader() {
         {/* 전체 본문 */}
         {content ? (
           <div className="text-sm text-text-secondary tour-markdown">
-            <ReactMarkdown components={MD_COMPONENTS}>{content}</ReactMarkdown>
+            <ClaimsContent content={content} mdComponents={MD_COMPONENTS} />
           </div>
         ) : (
           <p className="text-sm text-text-muted">_(본문 없음)_</p>

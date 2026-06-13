@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ReactMarkdown from "react-markdown"; // ktds-fork: knowledge 노트 본문 마크다운 렌더 (ADR-004 ID9)
+import ClaimsContent from "./ClaimsContent"; // ktds-fork (ADR-004): 본문 마크다운 + 근거 배지 카드
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
@@ -127,8 +127,9 @@ function KnowledgeNodeDetails({ node, graph }: { node: GraphNode; graph: Knowled
           {/* ktds-fork (ADR-004 ID9): raw font-mono 미리보기 → 마크다운 렌더 + 전체 본문(1500자 캡 제거).
               ktds knowledge-graph.json은 knowledgeMeta.content에 노트 전체 본문을 담는다(U-A 파서 text[:3000] 미경유). */}
           <div className="text-[11px] text-text-secondary leading-relaxed bg-elevated rounded-lg p-3 max-h-[420px] overflow-auto tour-markdown">
-            <ReactMarkdown
-              components={{
+            <ClaimsContent
+              content={meta.content}
+              mdComponents={{
                 h1: ({ children }) => <h1 className="text-[13px] font-semibold text-text-primary mb-1.5">{children}</h1>,
                 h2: ({ children }) => <h2 className="text-[12px] font-semibold text-text-primary mt-2 mb-1">{children}</h2>,
                 h3: ({ children }) => <h3 className="text-[11px] font-semibold text-text-primary mt-1.5 mb-1">{children}</h3>,
@@ -149,9 +150,7 @@ function KnowledgeNodeDetails({ node, graph }: { node: GraphNode; graph: Knowled
                 ul: ({ children }) => <ul className="list-disc list-inside mb-1.5 space-y-0.5">{children}</ul>,
                 ol: ({ children }) => <ol className="list-decimal list-inside mb-1.5 space-y-0.5">{children}</ol>,
               }}
-            >
-              {meta.content}
-            </ReactMarkdown>
+            />
           </div>
         </div>
       )}
