@@ -12,6 +12,7 @@
 - [ADR-002-understand-impact.md](./ADR-002-understand-impact.md) — `/understand-impact` 변경 영향도 결정 기록 (역/정 도달성으로 API/DB/흐름/연관모듈 영향 결정론 산출 + 인용 검증, 읽기전용 분석물, 수용 기준 N1~N7 — **Accepted**. 부록 A: SR 워크벤치 `--sr`/영향 규모 집계·대시보드 오버레이·구조/계층/도메인 뷰 표시. 부록 B: `/understand-review` 실측 리뷰·예측 대조·오버레이 2채널)
 - [UA_BASELINE.md](./UA_BASELINE.md) — U-A v2.7.3 검증된 노드/엣지 타입·필드 (kg-reader 기준)
 - [ADR-003-upstream-strategy.md](./ADR-003-upstream-strategy.md) — upstream 추종 전략 개정: **대시보드 부분 분기** (대시보드=ktds 소유·merge 시 ours·선별 cherry-pick, 분석 파이프라인=추종 유지 — **Accepted**)
+- [ADR-004-obsidian-wiki.md](./ADR-004-obsidian-wiki.md) — `/understand-docs` 세분화 위키 결정 기록 (domain/flow/endpoint/table 노트 + 위키링크 메시 + 결정론 직접 emit, 기본 동작·`--steps`/`--no-wiki`. **Accepted**. §8 구현 개정: 위키 그래프를 루트 `wiki-graph.json`에 두고 코드 그래프와 **같은 대시보드의 "문서" 뷰 토글 + 리더 레이아웃**으로 통합 — 도메인 뷰 패턴)
 - [UPSTREAM_MERGE.md](./UPSTREAM_MERGE.md) — U-A fork upstream 추종 절차 (소유 경계·merge ours 절차 — ADR-003 반영)
 
 ## 기획서 (상위)

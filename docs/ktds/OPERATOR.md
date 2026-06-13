@@ -124,9 +124,11 @@ node ktds-legacy-plugin/scripts/understand-review.mjs <projectRoot> analyze [--b
 ## 3. 문서 생성
 
 ```bash
-node ktds-legacy-plugin/scripts/understand-docs.mjs <projectRoot>
+node ktds-legacy-plugin/scripts/understand-docs.mjs <projectRoot>            # 기본 = 5종 + 세분화 위키
+node ktds-legacy-plugin/scripts/understand-docs.mjs <projectRoot> --steps    # + step 계층(폭증 구간)
+node ktds-legacy-plugin/scripts/understand-docs.mjs <projectRoot> --no-wiki  # 순수 5종(위키 도입 전과 바이트 동일)
 ```
-→ `docs/`에 5종 DRAFT 생성: `01_tech-stack` · `02_architecture` · `03_feature-spec` · `04_api-spec` · `05_db-spec`. 감사에 `DOC_GENERATED` 기록.
+→ `docs/`에 5종 DRAFT 생성: `01_tech-stack` · `02_architecture` · `03_feature-spec` · `04_api-spec` · `05_db-spec`. 감사에 `DOC_GENERATED` 기록. **기본으로 세분화 위키도 함께 생성**(§3-1).
 - `domain-graph.json`이 있으면 **자동 병합**되어 03에 도메인/엔터티/업무 규칙이 근거와 함께 렌더된다. domain 노드가 없으면 "/understand-map 먼저" 경고.
 - domain-graph가 KG·생성 commit보다 오래되면 **freshness 경고** → `emit` 재실행 권장.
 
@@ -140,6 +142,30 @@ node ktds-legacy-plugin/scripts/understand-docs.mjs <projectRoot>
 | `[확정(담당자)]` | 담당자 확정 |
 | `[추정]` | 추론 — 검토 권장 |
 | `[확인 필요]` | 동적 코드 등 자동 판단 불가 |
+
+## 3-1. 세분화 위키 (ADR-004 — 옵시디언/대시보드 "문서" 뷰)
+
+기본으로 5종과 함께 **domain/flow/endpoint/table 4계층 세분화 노트**를 생성한다(`docs/feature`·`docs/api`·`docs/table`/*.md). 각 노트 = frontmatter + 근거 claim(5종과 동일 태그·cite) + `[[위키링크]]` 관계. `docs/index.md`(옵시디언 진입) + 5 허브(`docs/0N.md`)에 "세분화 항목" 링크섹션 멱등 주입 + 대시보드용 **`<projectRoot>/.understand-anything/wiki-graph.json`**(코드/도메인 그래프 옆, 결정론 직접 emit).
+
+```bash
+node …/understand-docs.mjs <projectRoot> wiki          # 5종은 그대로, 위키만 재생성/갱신(멱등)
+node …/understand-docs.mjs <projectRoot> wiki --steps  # step 계층 포함
+node …/understand-docs.mjs <projectRoot> wiki status   # 노트 수·step 포함 여부·graph 경로
+```
+
+- **수명**: `wiki-graph.json`은 도메인 그래프와 같이 루트 `.understand-anything/`에 있어, `/understand` 재실행이 이 폴더를 재생성하면 지워진다 → `… wiki`로 재생성(domain-graph와 동형).
+- **산문**(선택): 노트 본문도 5종과 같은 계약으로 host(Claude)가 채울 수 있다(claim 근거 밖 단정 금지). 미주입 시 skeleton 그대로도 근거·관계는 채워져 있다.
+- `--no-wiki`는 위키 산출물을 만들지 않을 뿐, 기존 위키 파일을 지우진 않는다(5종 골든만 바이트 보장).
+
+### 대시보드에서 보기 — "문서" 뷰 토글
+프로젝트 **루트**로 대시보드를 띄운다(`docs/`가 아니라 루트):
+```bash
+cd understand-anything-plugin/packages/dashboard
+GRAPH_DIR=<projectRoot> npx vite --host 127.0.0.1   # 출력된 ?token= URL 접속
+```
+- 상단에 **코드 / 도메인 / 문서** 토글이 한 화면에. **"문서"**를 누르면 위키로 전환(도메인 뷰와 동일 패턴).
+- 문서 모드 = **리더 레이아웃**: 그래프 대신 가운데에 문서 본문, 상단에 **카테고리·태그·연결·백링크**, 우측 **"문서 폴더"** 트리(클릭 → 본문). 헤더 범례·레이어·Diff/영향도 토글은 문서 모드에서 숨겨진다.
+- **옵시디언**(선택): `docs/` 폴더를 vault로 직접 열면 같은 Karpathy 포맷이라 그래프·백링크·로컬그래프가 그대로 동작(별도 앱).
 
 ## 4. 검토 / 승인 / 감사
 

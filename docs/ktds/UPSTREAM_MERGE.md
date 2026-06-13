@@ -21,6 +21,8 @@ ktds가 손대는 upstream 매니페스트는 **2개**(둘 다 additive):
 
 upstream merge 시 1·2는 additive 라인 재적용, 대시보드 충돌은 전부 ours(아래 절차).
 
+**대시보드 위키 "문서" 뷰 fork (ADR-004 §8, 2026-06-14)** — 모두 대시보드 경로라 ADR-003 ours 규칙으로 자동 커버(개별 추적 의무 없음, `// ktds-fork` 주석은 참고용): `store.ts`(wikiGraph·ViewMode "wiki") · `App.tsx`(/wiki-graph fetch·"문서" 토글·렌더 분기·헤더 범례 숨김) · `KnowledgeGraphView`·`FileExplorer`·`NodeInfo`(문서 모드 wikiGraph 소스) · `WikiReader.tsx`(신규) · `vite.config.ts`(`/wiki-graph.json` 서빙 — impact-overlay 패턴과 동일). 입력 계약: ktds가 `<proj>/.understand-anything/wiki-graph.json`을 emit하면 대시보드가 "문서" 토글로 로드(domain-graph.json과 동형 — upstream 무관).
+
 ## 절차
 ```bash
 git fetch upstream

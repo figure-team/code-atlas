@@ -146,6 +146,30 @@
 
 ---
 
+## 4-4. 세분화 위키 (/understand-docs wiki, ADR-004)
+
+### 대시보드에 "문서" 토글이 안 보임
+- **원인:** 대시보드를 `docs/`가 아니라 **프로젝트 루트**로 띄워야 한다(`GRAPH_DIR=<projectRoot>`). 위키 그래프는 루트 `.understand-anything/wiki-graph.json`에 있다. 또는 위키 미생성.
+- **대응:** `… understand-docs.mjs <root> wiki`로 생성 후 `GRAPH_DIR=<root>`로 기동. 토글은 `wiki-graph.json`이 로드돼야 나타난다.
+
+### `/understand` 다시 돌렸더니 "문서" 토글이 사라짐
+- **원인:** `/understand`가 루트 `.understand-anything/`를 재생성하며 `wiki-graph.json`을 지운다(도메인 그래프와 동일 수명).
+- **대응:** `… understand-docs.mjs <root> wiki` 재실행(멱등). 코드/도메인 그래프 갱신 후 위키도 재생성하는 습관.
+
+### step 노트가 너무 많음(대규모 시스템)
+- **원인:** `--steps`는 코드량 비례 폭증 구간(jpetstore 32 → 대규모 수천).
+- **대응:** 기본(4계층, step 제외)으로 운영. step은 특정 흐름 추적이 필요할 때만 `--steps`.
+
+### 문서 모드 본문이 raw 텍스트로 보이거나 잘림
+- **원인:** 구버전 대시보드(ID9 fork 이전). 본문 마크다운 렌더+전체 본문은 understand-anything 2.8.0+ 필요.
+- **대응:** 대시보드 재빌드/재설치(2.8.0+).
+
+### `--no-wiki`인데 위키 파일이 남아 있음
+- **원인:** `--no-wiki`는 위키를 **만들지 않을** 뿐 기존 산출물을 삭제하지 않는다(5종 골든 바이트 동일만 보장).
+- **대응:** 정상. 위키를 지우려면 `docs/{feature,api,table}`·`docs/index.md`·루트 `.understand-anything/wiki-graph.json`을 수동 삭제.
+
+---
+
 ## 5. 내보내기 / 빌드
 
 - **HTML이 비어 보임/항목 없음:** 해당 노드 타입이 그래프에 없을 수 있음. **feature-spec(03)이 비면 `/understand-map`을 실행**하라 — scan→✋경계 확정→bundle→LLM 채움→emit으로 `domain-graph.json`이 생성되고, `/understand-docs`가 자동 병합한다(미실행 시 생성 단계에서 안내 경고가 뜬다). domain-graph가 KG보다 오래되면 freshness 경고가 뜬다 → `emit` 재실행.
